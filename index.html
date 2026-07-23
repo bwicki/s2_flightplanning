@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonde Flight Planning</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <div class="brand-text">
+      <h1>Sonde Flight Planning</h1>
+      <p>Latex sounding balloon ascent &amp; drift predictor</p>
+    </div>
+  </div>
+  <div class="topbar-status" id="statusLine">Set launch parameters to begin.</div>
+</header>
+
+<main class="layout">
+
+  <!-- ============ INPUT PANEL ============ -->
+  <section class="panel input-panel" aria-label="Flight parameters">
+
+    <div class="field-group">
+      <h2><span class="idx">01</span> Payload</h2>
+      <label for="sondeType">Sonde type</label>
+      <select id="sondeType">
+        <option value="sparv-s2" data-weight="9" selected>SparvEmbedded S2 (9 g)</option>
+        <option value="custom" data-weight="9">Custom…</option>
+      </select>
+      <div class="row-2">
+        <div>
+          <label for="sondeWeight">Sonde weight (g)</label>
+          <input type="number" id="sondeWeight" value="9" min="1" step="0.5">
+        </div>
+        <div>
+          <label for="riggingWeight">Rigging / line / parachute (g)</label>
+          <input type="number" id="riggingWeight" value="5" min="0" step="0.5">
+        </div>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <h2><span class="idx">02</span> Balloon</h2>
+      <label for="balloonType">Balloon type</label>
+      <select id="balloonType">
+        <option value="qualatex-9" data-weight="9" selected>Qualatex 9 g (latex party balloon)</option>
+        <option value="totex-100" data-weight="100">Totex/Hwoyee 100 g</option>
+        <option value="totex-200" data-weight="200">Totex/Hwoyee 200 g</option>
+        <option value="totex-300" data-weight="300">Totex/Hwoyee 300 g</option>
+        <option value="totex-350" data-weight="350">Totex/Hwoyee 350 g</option>
+        <option value="totex-500" data-weight="500">Totex/Hwoyee 500 g</option>
+        <option value="totex-600" data-weight="600">Totex/Hwoyee 600 g</option>
+        <option value="totex-800" data-weight="800">Totex/Hwoyee 800 g</option>
+        <option value="totex-1000" data-weight="1000">Totex/Hwoyee 1000 g</option>
+        <option value="totex-1200" data-weight="1200">Totex/Hwoyee 1200 g</option>
+        <option value="totex-1500" data-weight="1500">Totex/Hwoyee 1500 g</option>
+        <option value="totex-2000" data-weight="2000">Totex/Hwoyee 2000 g</option>
+        <option value="totex-3000" data-weight="3000">Totex/Hwoyee 3000 g</option>
+        <option value="custom" data-weight="9">Custom…</option>
+      </select>
+      <div class="row-2">
+        <div>
+          <label for="balloonWeight">Balloon weight (g)</label>
+          <input type="number" id="balloonWeight" value="9" min="1" step="1">
+        </div>
+        <div>
+          <label for="burstDiameterOverride">Burst diameter override (m, optional)</label>
+          <input type="number" id="burstDiameterOverride" placeholder="auto" min="0.1" step="0.01">
+        </div>
+      </div>
+      <p class="hint" id="burstDiameterHint"></p>
+    </div>
+
+    <div class="field-group">
+      <h2><span class="idx">03</span> Fill gas</h2>
+      <label for="gasType">Fill gas</label>
+      <select id="gasType">
+        <option value="ballongas-linde" data-lift="0.90" selected>Ballongas (Linde, He/air blend)</option>
+        <option value="helium" data-lift="1.045">Helium (pure)</option>
+        <option value="hydrogen" data-lift="1.135">Hydrogen</option>
+        <option value="custom" data-lift="0.90">Custom…</option>
+      </select>
+      <label for="gasLift">Lifting power at sea level (kg lift / m³)</label>
+      <input type="number" id="gasLift" value="0.90" min="0.1" step="0.01">
+      <p class="hint">Ballongas is a helium/air blend; exact lift depends on mix ratio &mdash; adjust if your supplier states a different value.</p>
+    </div>
+
+    <div class="field-group">
+      <h2><span class="idx">04</span> Launch site &amp; time</h2>
+      <label for="placeSearch">Location search</label>
+      <div class="row-inline">
+        <input type="text" id="placeSearch" placeholder="Place name…">
+        <button type="button" id="searchBtn" class="btn-secondary">Find</button>
+        <button type="button" id="geolocateBtn" class="btn-secondary" title="Use current device position">⦿ My position</button>
+      </div>
+      <div class="row-2">
+        <div>
+          <label for="launchLat">Latitude</label>
+          <input type="number" id="launchLat" value="47.3769" step="0.0001">
+        </div>
+        <div>
+          <label for="launchLon">Longitude</label>
+          <input type="number" id="launchLon" value="8.5417" step="0.0001">
+        </div>
+      </div>
+      <p class="hint">Or click directly on the map to set the launch site.</p>
+      <div class="row-2">
+        <div>
+          <label for="launchDate">Launch date (UTC)</label>
+          <input type="date" id="launchDate">
+        </div>
+        <div>
+          <label for="launchTime">Launch time (UTC)</label>
+          <input type="time" id="launchTime" step="60">
+        </div>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <h2><span class="idx">05</span> Flight profile</h2>
+      <label for="targetMode">Ascent target</label>
+      <select id="targetMode">
+        <option value="altitude" selected>Release at fixed altitude (m AMSL)</option>
+        <option value="burst">Ascend to burst height</option>
+      </select>
+      <div id="targetAltitudeWrap">
+        <label for="targetAltitude">Release / cutdown altitude (m AMSL)</label>
+        <input type="number" id="targetAltitude" value="20000" min="100" step="100">
+      </div>
+      <label for="ascentRate">Target ascent rate (m/s)</label>
+      <select id="ascentRate">
+        <option value="1.0">1.0 m/s</option>
+        <option value="1.5">1.5 m/s</option>
+        <option value="2.0">2.0 m/s</option>
+        <option value="2.5" selected>2.5 m/s</option>
+        <option value="3.0">3.0 m/s</option>
+        <option value="3.5">3.5 m/s</option>
+        <option value="4.0">4.0 m/s</option>
+      </select>
+      <label for="descentRate">Parachute descent rate at sea level (m/s)</label>
+      <input type="number" id="descentRate" value="5" min="1" max="15" step="0.5">
+    </div>
+
+    <button type="button" id="calcBtn" class="btn-primary">Calculate flight</button>
+    <p class="hint" id="calcError" role="alert"></p>
+  </section>
+
+  <!-- ============ MAP + RESULTS ============ -->
+  <section class="panel map-panel" aria-label="Map and trajectory">
+    <div id="map"></div>
+    <div class="map-legend">
+      <span><i class="dot launch"></i> Launch</span>
+      <span><i class="dot release"></i> Burst / release</span>
+      <span><i class="dot land"></i> Landing</span>
+      <span class="map-hint">Shift‑click the map to set a desired landing point and back‑calculate the launch site.</span>
+    </div>
+  </section>
+
+  <section class="panel results-panel" aria-label="Calculation results">
+    <h2><span class="idx">06</span> Results</h2>
+
+    <div class="result-grid">
+      <div class="result-card">
+        <span class="label">Local surface pressure</span>
+        <span class="value" id="resPressure">—</span>
+      </div>
+      <div class="result-card">
+        <span class="label">Gross lift (before payload)</span>
+        <span class="value" id="resGrossLift">—</span>
+      </div>
+      <div class="result-card">
+        <span class="label">Net lift (after payload)</span>
+        <span class="value" id="resNetLift">—</span>
+      </div>
+      <div class="result-card">
+        <span class="label">Required gas volume</span>
+        <span class="value" id="resGasVolume">—</span>
+      </div>
+      <div class="result-card">
+        <span class="label">Inflated diameter</span>
+        <span class="value" id="resDiameter">—</span>
+      </div>
+      <div class="result-card">
+        <span class="label">Predicted burst altitude</span>
+        <span class="value" id="resBurstAlt">—</span>
+      </div>
+      <div class="result-card">
+        <span class="label">Ascent time</span>
+        <span class="value" id="resAscentTime">—</span>
+      </div>
+      <div class="result-card">
+        <span class="label">Total flight time</span>
+        <span class="value" id="resFlightTime">—</span>
+      </div>
+      <div class="result-card">
+        <span class="label">Landing distance from launch</span>
+        <span class="value" id="resDistance">—</span>
+      </div>
+    </div>
+
+    <div class="profile-wrap">
+      <svg id="profileSvg" viewBox="0 0 640 200" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <p>Weather &amp; wind data: Open‑Meteo. Balloon burst diameters, drag and gas‑expansion model are approximations for mission planning &mdash; always cross‑check against your balloon manufacturer's data sheet and current NOTAM / airspace rules before launch.</p>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
