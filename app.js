@@ -1,38 +1,36 @@
 'use strict';
 
 /* =========================================================================
-   Sonde Flight Planning
+   Weather Sonde Flight Planning
    ---------------------------------------------------------------------
    All physics below are planning-grade approximations, not a certified
-   trajectory model. Sources / assumptions are noted inline. Weather and
-   wind data come from the free Open-Meteo API (no key required, CORS
-   enabled), which is why this can run as a static page on GitHub Pages.
+   trajectory model. Weather and wind data come from the free Open-Meteo
+   API (no key required, CORS enabled), which is why this can run as a
+   static page on GitHub Pages.
    ========================================================================= */
 
 // ---------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------
-const G0 = 9.80665;          // m/s^2
-const M_AIR = 0.0289644;     // kg/mol
-const R_GAS = 8.3144598;     // J/(mol*K)
-const R_SPECIFIC_AIR = 287.05; // J/(kg*K)
-const CD_BALLOON = 0.25;     // drag coefficient, sphere-ish latex balloon at high Re (planning assumption)
-const EARTH_R = 6371000;     // m, mean radius for flat-earth trajectory projection
+const G0 = 9.80665;
+const M_AIR = 0.0289644;
+const R_GAS = 8.3144598;
+const R_SPECIFIC_AIR = 287.05;
+const CD_BALLOON = 0.25;   // drag coefficient, planning assumption
+const EARTH_R = 6371000;
+
+const $ = id => document.getElementById(id);
 
 // Empirical burst-diameter fit (m) from published 100g-3000g sounding
-// balloon burst tables (Totex/Hwoyee/Kaymont), power-law regression:
-//   D_burst(m) ~= 0.208 * weight(g)^0.456
-// This is an approximation; always prefer a manufacturer data sheet value
-// via the override field, especially far outside the 100-3000g range
-// (e.g. small party-balloon-style presets).
+// balloon burst tables, power-law regression: D ~= 0.208 * w^0.456.
+// Outside that range (small party-style balloons) it is a rough
+// extrapolation - prefer the manual override with real data.
 function estimateBurstDiameter(weightGrams) {
   return 0.208 * Math.pow(weightGrams, 0.456);
 }
 
 // ---------------------------------------------------------------------
-// Standard-atmosphere model, anchored to an observed surface condition
-// (z0, P0 [Pa], T0 [K]) instead of MSL, using ICAO standard lapse rates.
-// Returns a function h(m ASL) -> {P, T, rho}
+// Standard atmosphere anchored to observed surface conditions
 // ---------------------------------------------------------------------
 function buildAtmosphere(z0, P0, T0) {
   const layers = [
@@ -79,8 +77,7 @@ function buildAtmosphere(z0, P0, T0) {
 }
 
 // ---------------------------------------------------------------------
-// Balloon sizing: solve gas volume at launch that yields the requested
-// ascent rate, given payload mass and gas lifting power.
+// Balloon sizing
 // ---------------------------------------------------------------------
 function solveLaunchVolume(params) {
   const { totalMassKg, effectiveLiftKgPerM3, rhoAirLocal, ascentRateMs } = params;
@@ -109,8 +106,7 @@ function solveLaunchVolume(params) {
 }
 
 // ---------------------------------------------------------------------
-// Burst altitude: gas volume grows as V(h) = V0 * (P0/P(h)) * (T(h)/T0)
-// (ideal gas, constant moles). Find h where V(h) = V_burst.
+// Burst altitude via ideal-gas expansion
 // ---------------------------------------------------------------------
 function solveBurstAltitude(atmosphere, z0, P0, T0, V0, Vburst, hMax) {
   function volumeAt(h) {
@@ -127,7 +123,7 @@ function solveBurstAltitude(atmosphere, z0, P0, T0, V0, Vburst, hMax) {
 }
 
 // ---------------------------------------------------------------------
-// Geo helpers (flat-earth projection, adequate for regional flight paths)
+// Geo helpers
 // ---------------------------------------------------------------------
 function destPoint(lat, lon, dNorthM, dEastM) {
   const dLat = dNorthM / EARTH_R;
@@ -142,14 +138,14 @@ function haversine(lat1, lon1, lat2, lon2) {
 }
 
 // ---------------------------------------------------------------------
-// Weather / wind acquisition via Open-Meteo (https://open-meteo.com)
+// Weather via Open-Meteo (wind + temperature on pressure levels)
 // ---------------------------------------------------------------------
 const PRESSURE_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100, 70, 50, 30];
 
 function buildHourlyParams() {
   const vars = [];
   PRESSURE_LEVELS.forEach(p => {
-    vars.push(`windspeed_${p}hPa`, `winddirection_${p}hPa`, `geopotential_height_${p}hPa`);
+    vars.push(`windspeed_${p}hPa`, `winddirection_${p}hPa`, `geopotential_height_${p}hPa`, `temperature_${p}hPa`);
   });
   return vars.join(',');
 }
@@ -177,8 +173,6 @@ async function fetchWeather(lat, lon, dateUTC, timeUTC, modelSlug) {
 
   let res = await fetch(url);
   if (!res.ok && modelSlug) {
-    // Fall back to the automatic best-match blend if the chosen model
-    // doesn't cover this location / variable set.
     res = await fetch(url.replace(modelParam, ''));
     modelSlug = null;
   }
@@ -204,7 +198,9 @@ async function fetchWeather(lat, lon, dateUTC, timeUTC, modelSlug) {
     surfaceTempK = (data.current?.temperature_2m ?? 15) + 273.15;
   }
 
-  const levels = [];
+  const levels = [];      // wind levels
+  const tempLevels = [];  // temperature levels for tropopause detection
+
   const w10 = isArchive ? data.hourly.windspeed_10m?.[idx] : data.current?.windspeed_10m;
   const d10 = isArchive ? data.hourly.winddirection_10m?.[idx] : data.current?.winddirection_10m;
   if (w10 != null && d10 != null) {
@@ -215,17 +211,40 @@ async function fetchWeather(lat, lon, dateUTC, timeUTC, modelSlug) {
     const alt = data.hourly[`geopotential_height_${p}hPa`]?.[idx];
     const spd = data.hourly[`windspeed_${p}hPa`]?.[idx];
     const dir = data.hourly[`winddirection_${p}hPa`]?.[idx];
+    const tmp = data.hourly[`temperature_${p}hPa`]?.[idx];
     if (alt != null && spd != null && dir != null) levels.push({ altitude: alt, speed: spd, dir: dir });
+    if (alt != null && tmp != null) tempLevels.push({ altitude: alt, tempC: tmp });
   });
 
   levels.sort((a, b) => a.altitude - b.altitude);
+  tempLevels.sort((a, b) => a.altitude - b.altitude);
 
   return {
-    elevation, surfacePressurePa, surfaceTempK, levels,
+    elevation, surfacePressurePa, surfaceTempK, levels, tempLevels,
     matchedTime: data.hourly.time[idx],
     modelUsed: modelSlug || 'best_match (automatic)',
     isArchive,
   };
+}
+
+// WMO-style tropopause: lowest level above ~4.5 km where the lapse rate
+// drops to <= 2 K/km and stays that low for the next ~2 km.
+function computeTropopause(tempLevels) {
+  if (!tempLevels || tempLevels.length < 3) return null;
+  for (let i = 0; i < tempLevels.length - 1; i++) {
+    const a = tempLevels[i], b = tempLevels[i + 1];
+    if (a.altitude < 4500) continue;
+    const lapse = -(b.tempC - a.tempC) / ((b.altitude - a.altitude) / 1000); // K/km
+    if (lapse <= 2) {
+      // Verify the mean lapse rate over the ~2 km above also stays <= 2 K/km
+      let refIdx = i, topIdx = i;
+      while (topIdx < tempLevels.length - 1 && tempLevels[topIdx].altitude - a.altitude < 2000) topIdx++;
+      const top = tempLevels[topIdx];
+      const meanLapse = -(top.tempC - a.tempC) / ((top.altitude - a.altitude) / 1000);
+      if (meanLapse <= 2 || topIdx === refIdx) return a.altitude;
+    }
+  }
+  return null;
 }
 
 async function geocodePlace(name) {
@@ -305,7 +324,7 @@ function computeTrajectory(opts) {
 }
 
 // =========================================================================
-// Balloon preset management (persisted in localStorage)
+// Balloon presets (persisted in localStorage; safe fallback when blocked)
 // =========================================================================
 const DEFAULT_PRESETS = [
   { id: 'qualatex-9', name: 'Qualatex 9 g (latex party balloon)', weight: 9 },
@@ -313,20 +332,26 @@ const DEFAULT_PRESETS = [
   { id: 'latex-30', name: 'Latex 30 g', weight: 30 },
 ];
 const PRESETS_KEY = 'sfp_balloon_presets_v1';
+let presetsMemory = null; // in-memory fallback if localStorage unavailable
 
 function loadPresets() {
   try {
     const raw = localStorage.getItem(PRESETS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignore corrupt storage */ }
-  return DEFAULT_PRESETS.slice();
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+    }
+  } catch (e) { /* storage blocked */ }
+  return presetsMemory || DEFAULT_PRESETS.map(p => ({ ...p }));
 }
 function savePresets(list) {
-  try { localStorage.setItem(PRESETS_KEY, JSON.stringify(list)); } catch { /* storage unavailable */ }
+  presetsMemory = list;
+  try { localStorage.setItem(PRESETS_KEY, JSON.stringify(list)); } catch (e) { /* storage blocked */ }
 }
 
 function renderPresetSelect(selectedId) {
   const sel = $('balloonType');
+  if (!sel) return;
   const presets = loadPresets();
   sel.innerHTML = '';
   presets.forEach(p => {
@@ -335,9 +360,15 @@ function renderPresetSelect(selectedId) {
     sel.appendChild(opt);
   });
   const customOpt = document.createElement('option');
-  customOpt.value = 'custom'; customOpt.textContent = 'Custom…'; customOpt.dataset.weight = $('balloonWeight').value || 9;
+  customOpt.value = 'custom'; customOpt.textContent = 'Custom…';
+  customOpt.dataset.weight = $('balloonWeight').value || 9;
   sel.appendChild(customOpt);
-  if (selectedId) sel.value = selectedId;
+
+  // Default selection: requested preset, else Qualatex 9 g, else first entry.
+  if (selectedId && presets.some(p => p.id === selectedId)) sel.value = selectedId;
+  else if (presets.some(p => p.id === 'qualatex-9')) sel.value = 'qualatex-9';
+  else sel.value = presets[0].id;
+
   const w = sel.selectedOptions[0]?.dataset.weight;
   if (w) $('balloonWeight').value = w;
 }
@@ -357,7 +388,7 @@ function addPreset() {
 
 function editPreset() {
   const sel = $('balloonType');
-  if (sel.value === 'custom') { alert('The "Custom…" entry is not a saved preset — just edit the weight field directly.'); return; }
+  if (sel.value === 'custom') { alert('The "Custom…" entry is not a saved preset — edit the weight field directly.'); return; }
   const presets = loadPresets();
   const idx = presets.findIndex(p => p.id === sel.value);
   if (idx === -1) return;
@@ -376,7 +407,7 @@ function deletePreset() {
   if (sel.value === 'custom') { alert('The "Custom…" entry can\'t be deleted.'); return; }
   let presets = loadPresets();
   if (presets.length <= 1) { alert('At least one saved preset must remain.'); return; }
-  const p = presets.find(p => p.id === sel.value);
+  const p = presets.find(x => x.id === sel.value);
   if (!p || !confirm(`Delete preset "${p.name}"?`)) return;
   presets = presets.filter(x => x.id !== sel.value);
   savePresets(presets);
@@ -385,19 +416,29 @@ function deletePreset() {
 }
 
 // =========================================================================
-// UI wiring
+// UI state
 // =========================================================================
-const $ = id => document.getElementById(id);
-
 const state = {
   map: null,
   launchMarker: null,
   releaseMarker: null,
   landMarker: null,
+  targetMarker: null,
   deviceMarker: null,
   trajectoryLine: null,
   lastResult: null,
+  busy: false,
 };
+
+function markerStyle(kind) {
+  const colors = { launch: '#59d18f', release: '#ffb020', land: '#ff6b6b', device: '#4fd1c5', target: '#b78cff' };
+  return { radius: 8, color: colors[kind], weight: 2, fillColor: colors[kind], fillOpacity: 0.55 };
+}
+
+function currentMode() {
+  const checked = document.querySelector('input[name="searchMode"]:checked');
+  return checked ? checked.value : 'forward';
+}
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 8);
@@ -409,18 +450,13 @@ function initMap() {
   state.launchMarker = L.circleMarker([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], markerStyle('launch')).addTo(state.map);
 
   state.map.on('click', (e) => {
-    const mode = document.querySelector('input[name="searchMode"]:checked').value;
-    if (mode === 'backward') {
-      reverseCalcFromLanding(e.latlng.lat, e.latlng.lng);
+    if (state.busy) return;
+    if (currentMode() === 'backward') {
+      reverseCalcFromLanding(e.latlng.lat, e.latlng.lng).catch(showError);
     } else {
       setLaunchPoint(e.latlng.lat, e.latlng.lng);
     }
   });
-}
-
-function markerStyle(kind) {
-  const colors = { launch: '#59d18f', release: '#ffb020', land: '#ff6b6b', device: '#4fd1c5' };
-  return { radius: 8, color: colors[kind], weight: 2, fillColor: colors[kind], fillOpacity: 0.55 };
 }
 
 function setLaunchPoint(lat, lon) {
@@ -448,51 +484,9 @@ function nowDefaults() {
 
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
-  $('themeToggle').textContent = theme === 'light' ? '◑' : '◐';
-  try { localStorage.setItem('sfp_theme', theme); } catch { /* ignore */ }
-}
-
-function wireDropdowns() {
-  $('sondeType').addEventListener('change', e => {
-    const w = e.target.selectedOptions[0].dataset.weight;
-    if (w) $('sondeWeight').value = w;
-  });
-  $('balloonType').addEventListener('change', e => {
-    const w = e.target.selectedOptions[0].dataset.weight;
-    if (w) $('balloonWeight').value = w;
-    updateBurstHint();
-  });
-  $('balloonWeight').addEventListener('input', updateBurstHint);
-  $('burstDiameterOverride').addEventListener('input', updateBurstHint);
-  $('addPresetBtn').addEventListener('click', addPreset);
-  $('editPresetBtn').addEventListener('click', editPreset);
-  $('deletePresetBtn').addEventListener('click', deletePreset);
-  $('gasType').addEventListener('change', e => {
-    const l = e.target.selectedOptions[0].dataset.lift;
-    if (l) $('gasLift').value = l;
-  });
-  $('targetMode').addEventListener('change', e => {
-    $('targetAltitudeWrap').style.display = e.target.value === 'altitude' ? '' : 'none';
-  });
-  $('geolocateBtn').addEventListener('click', useDeviceLocation);
-  $('searchBtn').addEventListener('click', searchPlace);
-  $('placeSearch').addEventListener('keydown', e => { if (e.key === 'Enter') searchPlace(); });
-  ['launchLat', 'launchLon'].forEach(id => $(id).addEventListener('change', () => {
-    const lat = parseFloat($('launchLat').value), lon = parseFloat($('launchLon').value);
-    if (!isNaN(lat) && !isNaN(lon)) { state.launchMarker.setLatLng([lat, lon]); state.map.panTo([lat, lon]); }
-  }));
-  $('calcBtn').addEventListener('click', () => runCalculation().catch(showError));
-  $('themeToggle').addEventListener('click', () => {
-    const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
-    applyTheme(cur === 'light' ? 'dark' : 'light');
-  });
-  $('exportJsonBtn').addEventListener('click', exportJson);
-  $('printBtn').addEventListener('click', () => window.print());
-  $('copyLinkBtn').addEventListener('click', copyShareLink);
-  $('exportImageBtn').addEventListener('click', exportImage);
-
-  renderPresetSelect();
-  updateBurstHint();
+  const btn = $('themeToggle');
+  if (btn) btn.textContent = theme === 'light' ? '◑' : '◐';
+  try { localStorage.setItem('sfp_theme', theme); } catch (e) { /* ignore */ }
 }
 
 function updateBurstHint() {
@@ -539,17 +533,14 @@ function showError(e) {
   console.error(e);
   $('calcError').textContent = e.message || String(e);
   setStatus('Calculation failed — see message under the form.');
+  state.busy = false;
 }
 
 // ---------------------------------------------------------------------
-// Main calculation orchestration
+// Core calculation given explicit launch coordinates. Returns everything
+// needed for rendering; does not touch the DOM.
 // ---------------------------------------------------------------------
-async function runCalculation() {
-  $('calcError').textContent = '';
-  setStatus('Fetching weather and wind data…');
-
-  const lat = parseFloat($('launchLat').value);
-  const lon = parseFloat($('launchLon').value);
+async function calculateFor(lat, lon) {
   const dateUTC = $('launchDate').value;
   const timeUTC = $('launchTime').value;
   if (!dateUTC || !timeUTC) throw new Error('Please set a launch date and time (UTC).');
@@ -568,11 +559,10 @@ async function runCalculation() {
   const gasLift = parseFloat($('gasLift').value) || 0.9;
   const ascentRate = parseFloat($('ascentRate').value);
   const descentRateSL = parseFloat($('descentRate').value);
-  const targetMode = $('targetMode').value;
+  const targetModeVal = $('targetMode').value;
   const targetAltInput = parseFloat($('targetAltitude').value) || 0;
 
   const effectiveLift = gasLift * (rho0 / 1.225);
-
   const totalMassKg = (balloonW + rigW + sondeW) / 1000;
   const V0 = solveLaunchVolume({ totalMassKg, effectiveLiftKgPerM3: effectiveLift, rhoAirLocal: rho0, ascentRateMs: ascentRate });
   if (!V0) throw new Error('Could not find a valid balloon size for these inputs — check weights and ascent rate.');
@@ -584,11 +574,10 @@ async function runCalculation() {
   const overrideD = parseFloat($('burstDiameterOverride').value);
   const burstDiameter = overrideD > 0 ? overrideD : estimateBurstDiameter(balloonW);
   const Vburst = (4 / 3) * Math.PI * Math.pow(burstDiameter / 2, 3);
-
   const burstAlt = solveBurstAltitude(atmosphere, z0, P0, T0, V0, Vburst, 45000);
 
   let releaseAlt, note = '';
-  if (targetMode === 'burst') {
+  if (targetModeVal === 'burst') {
     if (!burstAlt) throw new Error('Balloon does not reach burst volume within the modelled altitude range (45 km). Try a smaller balloon or larger diameter override.');
     releaseAlt = burstAlt;
   } else {
@@ -609,18 +598,32 @@ async function runCalculation() {
 
   const distanceM = haversine(lat, lon, traj.landing.lat, traj.landing.lon);
   const ascentTimeSec = (releaseAlt - z0) / ascentRate;
+  const tropopauseAlt = computeTropopause(weather.tempLevels);
 
-  state.lastResult = { weather, atmosphere, z0, P0, T0, burstAlt, releaseAlt, traj, V0, burstDiameter, Vburst, distanceM, ascentTimeSec };
+  return {
+    weather, atmosphere, z0, P0, T0, burstAlt, releaseAlt, traj, V0,
+    burstDiameter, Vburst, distanceM, ascentTimeSec, grossLiftKg, netLiftKg,
+    tropopauseAlt, note,
+  };
+}
 
-  renderResults({
-    surfacePressureHpa: P0 / 100,
-    grossLiftKg, netLiftKg, V0, burstDiameter, burstAlt, ascentTimeSec,
-    totalTimeSec: traj.totalTimeSec, distanceM, note, weather,
-  });
-  drawTrajectory(traj);
-  drawProfile(traj);
-
-  setStatus(note || `Calculation complete — matched weather at ${weather.matchedTime} UTC.`);
+async function runCalculation() {
+  if (state.busy) return;
+  state.busy = true;
+  $('calcError').textContent = '';
+  setStatus('Fetching weather and wind data…');
+  try {
+    const lat = parseFloat($('launchLat').value);
+    const lon = parseFloat($('launchLon').value);
+    const r = await calculateFor(lat, lon);
+    state.lastResult = r;
+    renderResults(r);
+    drawTrajectory(r.traj);
+    drawProfile(r.traj);
+    setStatus(r.note || `Calculation complete — matched weather at ${r.weather.matchedTime} UTC.`);
+  } finally {
+    state.busy = false;
+  }
 }
 
 function fmtDuration(sec) {
@@ -629,7 +632,7 @@ function fmtDuration(sec) {
 }
 
 function renderResults(r) {
-  $('resPressure').textContent = `${r.surfacePressureHpa.toFixed(1)} hPa`;
+  $('resPressure').textContent = `${(r.P0 / 100).toFixed(1)} hPa`;
   $('resGrossLift').textContent = `${(r.grossLiftKg * 1000).toFixed(1)} g`;
   $('resNetLift').textContent = `${(r.netLiftKg * 1000).toFixed(1)} g`;
   $('resGasVolume').textContent = `${r.V0.toFixed(3)} m³`;
@@ -637,8 +640,11 @@ function renderResults(r) {
   $('resDiameter').textContent = `${diam.toFixed(2)} m`;
   $('resBurstAlt').textContent = r.burstAlt ? `${Math.round(r.burstAlt).toLocaleString()} m AMSL` : 'not reached ≤45 km';
   $('resAscentTime').textContent = fmtDuration(r.ascentTimeSec);
-  $('resFlightTime').textContent = fmtDuration(r.totalTimeSec);
+  $('resFlightTime').textContent = fmtDuration(r.traj.totalTimeSec);
   $('resDistance').textContent = `${(r.distanceM / 1000).toFixed(1)} km`;
+  $('resTropopause').textContent = r.tropopauseAlt
+    ? `${Math.round(r.tropopauseAlt).toLocaleString()} m AMSL`
+    : 'not detectable from levels';
   $('resWeatherSource').textContent = `Open-Meteo ${r.weather.isArchive ? '(historical archive)' : '(forecast)'} — model: ${r.weather.modelUsed} — matched: ${r.weather.matchedTime} UTC`;
   if (r.note) $('calcError').textContent = r.note;
 }
@@ -662,12 +668,40 @@ function drawTrajectory(traj) {
   state.map.fitBounds(state.trajectoryLine.getBounds(), { padding: [30, 30] });
 }
 
+// ---------------------------------------------------------------------
+// Profile chart: compact box with fine grid (500 m / 10 min)
+// ---------------------------------------------------------------------
 function drawProfile(traj) {
   const svg = $('profileSvg');
-  const W = 640, H = 200, padL = 46, padB = 24, padT = 12, padR = 12;
-  const maxT = traj.totalTimeSec, maxA = traj.path[traj.releaseIdx].alt;
-  const x = t => padL + (t / maxT) * (W - padL - padR);
-  const y = a => H - padB - (a / maxA) * (H - padB - padT);
+  const W = 420, H = 280, padL = 48, padB = 28, padT = 10, padR = 10;
+  const plotW = W - padL - padR, plotH = H - padB - padT;
+
+  const maxT = traj.totalTimeSec;
+  const minA = Math.floor(traj.path[0].alt / 500) * 500;
+  const maxAraw = traj.path[traj.releaseIdx].alt;
+  const maxA = Math.ceil(maxAraw / 500) * 500;
+
+  const x = t => padL + (t / maxT) * plotW;
+  const y = a => padT + plotH - ((a - minA) / (maxA - minA)) * plotH;
+
+  let grid = '';
+  // Horizontal grid lines every 500 m
+  for (let a = minA; a <= maxA; a += 500) {
+    const yy = y(a);
+    const major = a % 2500 === 0;
+    grid += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="var(--grid-line)" stroke-width="${major ? 1 : 0.5}" opacity="${major ? 0.9 : 0.5}"/>`;
+    if (major) grid += `<text x="${padL - 5}" y="${yy + 3}" text-anchor="end" fill="var(--text-dim)" font-size="8.5" font-family="IBM Plex Mono">${(a / 1000).toFixed(1)}k</text>`;
+  }
+  // Vertical grid lines every 10 min
+  const stepT = 600;
+  const labelEvery = Math.max(1, Math.ceil((maxT / stepT) / 8)); // avoid label crowding
+  let k = 0;
+  for (let t = 0; t <= maxT; t += stepT, k++) {
+    const xx = x(t);
+    const labelled = k % labelEvery === 0;
+    grid += `<line x1="${xx}" y1="${padT}" x2="${xx}" y2="${H - padB}" stroke="var(--grid-line)" stroke-width="${labelled ? 1 : 0.5}" opacity="${labelled ? 0.9 : 0.5}"/>`;
+    if (labelled) grid += `<text x="${xx}" y="${H - padB + 12}" text-anchor="middle" fill="var(--text-dim)" font-size="8.5" font-family="IBM Plex Mono">${Math.round(t / 60)}′</text>`;
+  }
 
   let d = `M ${x(0)} ${y(traj.path[0].alt)}`;
   traj.path.forEach(p => { d += ` L ${x(p.t)} ${y(p.alt)}`; });
@@ -676,59 +710,64 @@ function drawProfile(traj) {
   const landP = traj.path[traj.path.length - 1];
 
   svg.innerHTML = `
-    <line x1="${padL}" y1="${H - padB}" x2="${W - padR}" y2="${H - padB}" stroke="#1f3352" stroke-width="1"/>
-    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H - padB}" stroke="#1f3352" stroke-width="1"/>
-    <path d="${d}" fill="none" stroke="#4fd1c5" stroke-width="2.5"/>
-    <circle cx="${x(0)}" cy="${y(traj.path[0].alt)}" r="4" fill="#59d18f"/>
-    <circle cx="${x(releaseP.t)}" cy="${y(releaseP.alt)}" r="4" fill="#ffb020"/>
-    <circle cx="${x(landP.t)}" cy="${y(landP.alt)}" r="4" fill="#ff6b6b"/>
-    <text x="${padL}" y="${H - 6}" fill="#8aa0bf" font-size="10" font-family="IBM Plex Mono">0h</text>
-    <text x="${W - padR - 34}" y="${H - 6}" fill="#8aa0bf" font-size="10" font-family="IBM Plex Mono">${fmtDuration(maxT)}</text>
-    <text x="4" y="${padT + 6}" fill="#8aa0bf" font-size="10" font-family="IBM Plex Mono">${Math.round(maxA / 1000)}km</text>
-    <text x="4" y="${H - padB}" fill="#8aa0bf" font-size="10" font-family="IBM Plex Mono">0</text>
+    ${grid}
+    <rect x="${padL}" y="${padT}" width="${plotW}" height="${plotH}" fill="none" stroke="var(--grid-line)" stroke-width="1"/>
+    <path d="${d}" fill="none" stroke="#4fd1c5" stroke-width="2"/>
+    <circle cx="${x(0)}" cy="${y(traj.path[0].alt)}" r="3.5" fill="#59d18f"/>
+    <circle cx="${x(releaseP.t)}" cy="${y(releaseP.alt)}" r="3.5" fill="#ffb020"/>
+    <circle cx="${x(landP.t)}" cy="${y(landP.alt)}" r="3.5" fill="#ff6b6b"/>
+    <text x="${padL - 5}" y="${padT + 4}" text-anchor="end" fill="var(--text-dim)" font-size="8.5" font-family="IBM Plex Mono">m</text>
+    <text x="${W - padR}" y="${H - 4}" text-anchor="end" fill="var(--text-dim)" font-size="8.5" font-family="IBM Plex Mono">min</text>
   `;
 }
 
 // ---------------------------------------------------------------------
-// Reverse calculation
+// Backward mode: click sets desired landing; solve a matching launch site.
 // ---------------------------------------------------------------------
 async function reverseCalcFromLanding(targetLat, targetLon) {
-  if (!state.lastResult) {
-    setStatus('Run a calculation first, then use "Backward" mode and click the map to back-solve a launch site.');
-    return;
-  }
-  setStatus('Back-solving launch site for the desired landing point…');
+  state.busy = true;
   try {
+    // Mark the desired landing point (violet) immediately.
+    if (state.targetMarker) state.map.removeLayer(state.targetMarker);
+    state.targetMarker = L.circleMarker([targetLat, targetLon], markerStyle('target')).addTo(state.map)
+      .bindPopup(`Desired landing<br>${targetLat.toFixed(4)}, ${targetLon.toFixed(4)}`).openPopup();
+
+    setStatus('Back-solving launch site for the desired landing point…');
+    $('calcError').textContent = '';
+
+    // Start from the current launch coordinates; if no calculation exists
+    // yet, seed the drift vector with a forward run first.
     let launchLat = parseFloat($('launchLat').value);
     let launchLon = parseFloat($('launchLon').value);
-    const modelSlug = $('weatherModel').value || null;
 
-    for (let iter = 0; iter < 2; iter++) {
-      const dateUTC = $('launchDate').value, timeUTC = $('launchTime').value;
-      const weather = await fetchWeather(launchLat, launchLon, dateUTC, timeUTC, modelSlug);
-      const z0 = weather.elevation, P0 = weather.surfacePressurePa, T0 = weather.surfaceTempK;
-      const atmosphere = buildAtmosphere(z0, P0, T0);
-      const r = state.lastResult;
-      const traj = computeTrajectory({
-        launchLat, launchLon, z0, releaseAlt: r.releaseAlt, groundAlt: z0,
-        atmosphere, levels: weather.levels,
-        ascentRateMs: parseFloat($('ascentRate').value),
-        descentRateSeaLevel: parseFloat($('descentRate').value),
-        startEpochMs: r.traj.startEpochMs,
-      });
-      const dLat = targetLat - traj.landing.lat;
-      const dLon = targetLon - traj.landing.lon;
+    // Iteratively shift the launch point by the residual landing error.
+    let result = null;
+    for (let iter = 0; iter < 3; iter++) {
+      result = await calculateFor(launchLat, launchLon);
+      const dLat = targetLat - result.traj.landing.lat;
+      const dLon = targetLon - result.traj.landing.lon;
+      const errM = haversine(targetLat, targetLon, result.traj.landing.lat, result.traj.landing.lon);
+      if (errM < 500) break; // close enough
       launchLat += dLat;
       launchLon += dLon;
-      state.lastResult.traj = traj;
     }
 
-    setLaunchPoint(launchLat, launchLon);
-    state.map.setView([launchLat, launchLon], state.map.getZoom());
-    await runCalculation();
-    setStatus(`Back-solved launch site so the balloon should land near ${targetLat.toFixed(4)}, ${targetLon.toFixed(4)} (wind-model approximation).`);
-  } catch (e) {
-    showError(e);
+    // Final run from the solved launch point.
+    result = await calculateFor(launchLat, launchLon);
+    state.lastResult = result;
+
+    $('launchLat').value = launchLat.toFixed(5);
+    $('launchLon').value = launchLon.toFixed(5);
+    state.launchMarker.setLatLng([launchLat, launchLon]);
+
+    renderResults(result);
+    drawTrajectory(result.traj);
+    drawProfile(result.traj);
+
+    const finalErr = haversine(targetLat, targetLon, result.traj.landing.lat, result.traj.landing.lon);
+    setStatus(`Back-solved launch site — predicted landing is ${(finalErr / 1000).toFixed(1)} km from the desired point (wind-model approximation).`);
+  } finally {
+    state.busy = false;
   }
 }
 
@@ -751,16 +790,17 @@ function gatherInputs() {
 function applyInputs(inputs) {
   Object.entries(inputs).forEach(([k, v]) => { if ($(k) && v != null) $(k).value = v; });
   $('targetAltitudeWrap').style.display = $('targetMode').value === 'altitude' ? '' : 'none';
-  if (state.map) { state.launchMarker.setLatLng([parseFloat(inputs.launchLat), parseFloat(inputs.launchLon)]); state.map.panTo([parseFloat(inputs.launchLat), parseFloat(inputs.launchLon)]); }
+  if (state.map) {
+    const la = parseFloat(inputs.launchLat), lo = parseFloat(inputs.launchLon);
+    if (!isNaN(la) && !isNaN(lo)) { state.launchMarker.setLatLng([la, lo]); state.map.panTo([la, lo]); }
+  }
 }
 
 function exportJson() {
   if (!state.lastResult) { setStatus('Run a calculation first before exporting.'); return; }
   const results = {};
   document.querySelectorAll('.result-card').forEach(card => {
-    const label = card.querySelector('.label').textContent;
-    const value = card.querySelector('.value').textContent;
-    results[label] = value;
+    results[card.querySelector('.label').textContent] = card.querySelector('.value').textContent;
   });
   const payload = { generatedAt: new Date().toISOString(), inputs: gatherInputs(), results };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -792,7 +832,7 @@ function loadStateFromUrl() {
     const inputs = JSON.parse(decodeURIComponent(atob(encoded)));
     applyInputs(inputs);
     setStatus('Loaded flight parameters from shared link. Press "Calculate flight" to run the prediction.');
-  } catch { /* ignore malformed state */ }
+  } catch (e) { /* malformed */ }
 }
 
 function exportImage() {
@@ -803,22 +843,73 @@ function exportImage() {
     a.href = canvas.toDataURL('image/png');
     a.download = `sonde-flight-plan-${Date.now()}.png`;
     a.click();
-    setStatus('Image exported. Note: map tiles may be omitted if the browser blocks cross-origin map images.');
+    setStatus('Image exported.');
   }).catch(() => {
-    setStatus('Image export failed — some map tiles may block canvas export in this browser. Try a screenshot instead.');
+    setStatus('Image export failed — try a screenshot instead.');
   });
 }
 
 // ---------------------------------------------------------------------
-// Init
+// Wiring (each block guarded so one failure can't break the rest)
 // ---------------------------------------------------------------------
-window.addEventListener('DOMContentLoaded', () => {
-  let theme = 'dark';
-  try { theme = localStorage.getItem('sfp_theme') || (window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch { /* ignore */ }
-  applyTheme(theme);
+function on(id, event, handler) {
+  const el = $(id);
+  if (el) el.addEventListener(event, handler);
+  else console.warn('Missing element:', id);
+}
 
-  nowDefaults();
-  initMap();
-  wireDropdowns();
-  loadStateFromUrl();
+function wireUI() {
+  on('sondeType', 'change', e => {
+    const w = e.target.selectedOptions[0].dataset.weight;
+    if (w) $('sondeWeight').value = w;
+  });
+  on('balloonType', 'change', e => {
+    const w = e.target.selectedOptions[0].dataset.weight;
+    if (w) $('balloonWeight').value = w;
+    updateBurstHint();
+  });
+  on('balloonWeight', 'input', updateBurstHint);
+  on('burstDiameterOverride', 'input', updateBurstHint);
+  on('addPresetBtn', 'click', addPreset);
+  on('editPresetBtn', 'click', editPreset);
+  on('deletePresetBtn', 'click', deletePreset);
+  on('gasType', 'change', e => {
+    const l = e.target.selectedOptions[0].dataset.lift;
+    if (l) $('gasLift').value = l;
+  });
+  on('targetMode', 'change', e => {
+    $('targetAltitudeWrap').style.display = e.target.value === 'altitude' ? '' : 'none';
+  });
+  on('geolocateBtn', 'click', useDeviceLocation);
+  on('searchBtn', 'click', searchPlace);
+  on('placeSearch', 'keydown', e => { if (e.key === 'Enter') searchPlace(); });
+  ['launchLat', 'launchLon'].forEach(id => on(id, 'change', () => {
+    const lat = parseFloat($('launchLat').value), lon = parseFloat($('launchLon').value);
+    if (!isNaN(lat) && !isNaN(lon)) { state.launchMarker.setLatLng([lat, lon]); state.map.panTo([lat, lon]); }
+  }));
+  on('calcBtn', 'click', () => runCalculation().catch(showError));
+  on('themeToggle', 'click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    applyTheme(cur === 'light' ? 'dark' : 'light');
+  });
+  on('exportJsonBtn', 'click', exportJson);
+  on('printBtn', 'click', () => window.print());
+  on('copyLinkBtn', 'click', copyShareLink);
+  on('exportImageBtn', 'click', exportImage);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const safe = (label, fn) => { try { fn(); } catch (e) { console.error(label, e); } };
+
+  safe('theme', () => {
+    let theme = 'dark';
+    try { theme = localStorage.getItem('sfp_theme') || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch (e) { /* ignore */ }
+    applyTheme(theme);
+  });
+  safe('defaults', nowDefaults);
+  safe('map', initMap);
+  safe('presets', () => renderPresetSelect('qualatex-9'));
+  safe('wiring', wireUI);
+  safe('bursthint', updateBurstHint);
+  safe('urlstate', loadStateFromUrl);
 });

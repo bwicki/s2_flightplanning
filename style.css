@@ -11,6 +11,8 @@
   --cyan: #4fd1c5;
   --red: #ff6b6b;
   --green: #59d18f;
+  --violet: #b78cff;
+  --grid-line: #1f3352;
   --font-display: 'Space Grotesk', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace;
   --radius: 10px;
@@ -29,6 +31,8 @@
   --cyan: #128f83;
   --red: #c23b3b;
   --green: #1f9d5c;
+  --violet: #7a4fd1;
+  --grid-line: #dbe4f0;
 }
 
 * { box-sizing: border-box; }
@@ -53,10 +57,10 @@ h1, h2 { font-family: var(--font-display); margin: 0; }
   gap: 16px;
   padding: 18px 28px;
   border-bottom: 1px solid var(--panel-border);
-  background: rgba(10, 18, 32, 0.06);
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
   position: sticky;
   top: 0;
-  z-index: 50;
+  z-index: 1200;
   backdrop-filter: blur(6px);
 }
 .brand { display: flex; align-items: center; gap: 14px; }
@@ -114,6 +118,7 @@ h1, h2 { font-family: var(--font-display); margin: 0; }
 
 .field-group { margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px dashed var(--panel-border); }
 .field-group:last-of-type { border-bottom: none; margin-bottom: 12px; }
+.map-panel .field-group:first-of-type { margin-top: 14px; }
 
 .field-group h2, .results-panel h2 {
   font-size: 0.92rem;
@@ -208,55 +213,81 @@ input:focus, select:focus, button:focus-visible {
 
 #calcError { color: var(--red); min-height: 1em; }
 
+/* ---------- Map toolbar (mode switch + legend) ---------- */
+.map-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 12px;
+}
+.mode-switch {
+  display: inline-flex;
+  background: var(--field-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 3px;
+}
+.mode-opt { position: relative; }
+.mode-opt input { position: absolute; opacity: 0; width: 0; height: 0; }
+.mode-opt span {
+  display: inline-block;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--text-dim);
+  transition: background 0.12s ease, color 0.12s ease;
+  user-select: none;
+}
+.mode-opt span:hover { color: var(--text); }
+.mode-opt input:checked + span {
+  background: var(--accent);
+  color: #1a1200;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+.map-legend-inline {
+  display: flex;
+  gap: 14px;
+  font-size: 0.73rem;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+}
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
+.dot.launch { background: var(--green); }
+.dot.release { background: var(--accent); }
+.dot.land { background: var(--red); }
+.dot.target { background: var(--violet); }
+
 /* ---------- Map ---------- */
 .map-panel #map {
   height: 560px;
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--panel-border);
+  position: relative;
+  z-index: 1;
 }
-.map-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px 18px;
-  align-items: center;
-  padding: 12px 0 4px;
-  font-size: 0.75rem;
-  color: var(--text-dim);
-}
-.map-legend .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: middle; }
-.dot.launch { background: var(--green); }
-.dot.release { background: var(--accent); }
-.dot.land { background: var(--red); }
-
-.search-mode-toggle {
-  display: flex;
-  gap: 4px;
-  margin-left: auto;
-  background: var(--field-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 7px;
-  padding: 3px;
-}
-.toggle-opt { position: relative; }
-.toggle-opt input { position: absolute; opacity: 0; width: 0; height: 0; }
-.toggle-opt span {
-  display: inline-block;
-  padding: 6px 10px;
-  border-radius: 5px;
-  font-size: 0.7rem;
-  cursor: pointer;
-  color: var(--text-dim);
-}
-.toggle-opt input:checked + span { background: var(--accent); color: #1a1200; font-weight: 600; }
 
 /* ---------- Results ---------- */
 .results-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
 .export-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
+.results-body {
+  display: grid;
+  grid-template-columns: 1fr 430px;
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 1100px) { .results-body { grid-template-columns: 1fr; } }
+
 .result-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
 @media (max-width: 900px) { .result-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -270,13 +301,18 @@ input:focus, select:focus, button:focus-visible {
   flex-direction: column;
   gap: 6px;
 }
-.result-card.wide { grid-column: span 2; }
-@media (max-width: 900px) { .result-card.wide { grid-column: span 2; } }
+.result-card.wide { grid-column: 1 / -1; }
 .result-card .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); }
 .result-card .value { font-family: var(--font-mono); font-size: 1.05rem; color: var(--accent); word-break: break-word; }
 
-.profile-wrap { margin-top: 18px; }
-#profileSvg { width: 100%; height: auto; }
+.profile-box {
+  background: var(--field-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.profile-box .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); display: block; margin-bottom: 8px; }
+#profileSvg { width: 100%; height: auto; display: block; }
 
 /* ---------- Footer ---------- */
 .footer {
@@ -297,10 +333,12 @@ input:focus, select:focus, button:focus-visible {
 /* ---------- Print ---------- */
 @media print {
   .topbar, .input-panel, .footer, .export-actions,
-  .map-legend, #calcBtn, #calcError, .field-group { display: none !important; }
+  .map-toolbar, #calcBtn, #calcError, .field-group { display: none !important; }
   .layout { display: block; padding: 0; }
   .map-panel { border: none; padding: 0; }
   .map-panel #map { height: 380px; }
-  .results-panel { grid-column: auto; border: none; }
+  .results-panel { border: none; }
+  .results-body { display: block; }
+  .profile-box { margin-top: 12px; }
   body { background: #fff; color: #000; }
 }

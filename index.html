@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sonde Flight Planning</title>
+<title>Weather Sonde Flight Planning</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 
@@ -15,8 +15,8 @@
   <div class="brand">
     <span class="brand-mark" aria-hidden="true"></span>
     <div class="brand-text">
-      <h1>Sonde Flight Planning</h1>
-      <p>Latex sounding balloon ascent &amp; drift predictor</p>
+      <h1>Weather Sonde Flight Planning</h1>
+      <p>Weather sounding balloon ascent &amp; drift predictor</p>
     </div>
   </div>
   <div class="topbar-right">
@@ -88,23 +88,27 @@
 
   <!-- ============ RIGHT: MAP + LAUNCH SITE/TIME + FLIGHT PROFILE ============ -->
   <section class="panel map-panel" aria-label="Map and flight setup">
-    <div id="map"></div>
 
-    <div class="map-legend">
-      <span><i class="dot launch"></i> Launch</span>
-      <span><i class="dot release"></i> Burst / release</span>
-      <span><i class="dot land"></i> Landing</span>
-      <div class="search-mode-toggle" role="radiogroup" aria-label="Map click mode">
-        <label class="toggle-opt">
+    <div class="map-toolbar">
+      <div class="mode-switch" role="radiogroup" aria-label="Map click mode" id="modeSwitch">
+        <label class="mode-opt">
           <input type="radio" name="searchMode" value="forward" checked>
-          <span>Forward: click sets launch, predicts landing</span>
+          <span title="Click on the map to set the launch site; the landing site is predicted.">⬈ Forward &mdash; set launch, predict landing</span>
         </label>
-        <label class="toggle-opt">
+        <label class="mode-opt">
           <input type="radio" name="searchMode" value="backward">
-          <span>Backward: click sets desired landing, solves launch</span>
+          <span title="Click on the map to set the desired landing site; a matching launch site is back-solved.">⬊ Backward &mdash; set landing, solve launch</span>
         </label>
       </div>
+      <div class="map-legend-inline">
+        <span><i class="dot launch"></i> Launch</span>
+        <span><i class="dot release"></i> Burst / release</span>
+        <span><i class="dot land"></i> Landing</span>
+        <span><i class="dot target"></i> Desired landing</span>
+      </div>
     </div>
+
+    <div id="map"></div>
 
     <div class="field-group">
       <h2><span class="idx">04</span> Launch site &amp; time</h2>
@@ -158,7 +162,7 @@
       </select>
       <div id="targetAltitudeWrap">
         <label for="targetAltitude">Release / cutdown altitude (m AMSL)</label>
-        <input type="number" id="targetAltitude" value="20000" min="100" step="100">
+        <input type="number" id="targetAltitude" value="5500" min="100" step="100">
       </div>
       <label for="ascentRate">Target ascent rate (m/s)</label>
       <select id="ascentRate">
@@ -190,51 +194,58 @@
       </div>
     </div>
 
-    <div class="result-grid">
-      <div class="result-card">
-        <span class="label">Local surface pressure</span>
-        <span class="value" id="resPressure">—</span>
+    <div class="results-body">
+      <div class="result-grid">
+        <div class="result-card">
+          <span class="label">Local surface pressure</span>
+          <span class="value" id="resPressure">—</span>
+        </div>
+        <div class="result-card">
+          <span class="label">Gross lift (before payload)</span>
+          <span class="value" id="resGrossLift">—</span>
+        </div>
+        <div class="result-card">
+          <span class="label">Net lift (after payload)</span>
+          <span class="value" id="resNetLift">—</span>
+        </div>
+        <div class="result-card">
+          <span class="label">Required gas volume</span>
+          <span class="value" id="resGasVolume">—</span>
+        </div>
+        <div class="result-card">
+          <span class="label">Inflated diameter</span>
+          <span class="value" id="resDiameter">—</span>
+        </div>
+        <div class="result-card">
+          <span class="label">Predicted burst altitude</span>
+          <span class="value" id="resBurstAlt">—</span>
+        </div>
+        <div class="result-card">
+          <span class="label">Ascent time</span>
+          <span class="value" id="resAscentTime">—</span>
+        </div>
+        <div class="result-card">
+          <span class="label">Total flight time</span>
+          <span class="value" id="resFlightTime">—</span>
+        </div>
+        <div class="result-card">
+          <span class="label">Landing distance from launch</span>
+          <span class="value" id="resDistance">—</span>
+        </div>
+        <div class="result-card">
+          <span class="label">Tropopause (from weather model)</span>
+          <span class="value" id="resTropopause">—</span>
+        </div>
+        <div class="result-card wide">
+          <span class="label">Weather data used</span>
+          <span class="value" id="resWeatherSource">—</span>
+        </div>
       </div>
-      <div class="result-card">
-        <span class="label">Gross lift (before payload)</span>
-        <span class="value" id="resGrossLift">—</span>
-      </div>
-      <div class="result-card">
-        <span class="label">Net lift (after payload)</span>
-        <span class="value" id="resNetLift">—</span>
-      </div>
-      <div class="result-card">
-        <span class="label">Required gas volume</span>
-        <span class="value" id="resGasVolume">—</span>
-      </div>
-      <div class="result-card">
-        <span class="label">Inflated diameter</span>
-        <span class="value" id="resDiameter">—</span>
-      </div>
-      <div class="result-card">
-        <span class="label">Predicted burst altitude</span>
-        <span class="value" id="resBurstAlt">—</span>
-      </div>
-      <div class="result-card">
-        <span class="label">Ascent time</span>
-        <span class="value" id="resAscentTime">—</span>
-      </div>
-      <div class="result-card">
-        <span class="label">Total flight time</span>
-        <span class="value" id="resFlightTime">—</span>
-      </div>
-      <div class="result-card">
-        <span class="label">Landing distance from launch</span>
-        <span class="value" id="resDistance">—</span>
-      </div>
-      <div class="result-card wide">
-        <span class="label">Weather data used</span>
-        <span class="value" id="resWeatherSource">—</span>
-      </div>
-    </div>
 
-    <div class="profile-wrap">
-      <svg id="profileSvg" viewBox="0 0 640 200" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="profile-box">
+        <span class="label">Ascent / descent profile</span>
+        <svg id="profileSvg" viewBox="0 0 420 280" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
     </div>
   </section>
 
@@ -246,6 +257,6 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>
