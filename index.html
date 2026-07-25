@@ -19,13 +19,16 @@
       <p>Latex sounding balloon ascent &amp; drift predictor</p>
     </div>
   </div>
-  <div class="topbar-status" id="statusLine">Set launch parameters to begin.</div>
+  <div class="topbar-right">
+    <div class="topbar-status" id="statusLine">Set launch parameters to begin.</div>
+    <button type="button" id="themeToggle" class="btn-icon" title="Toggle light / dark theme" aria-label="Toggle light / dark theme">◐</button>
+  </div>
 </header>
 
 <main class="layout">
 
-  <!-- ============ INPUT PANEL ============ -->
-  <section class="panel input-panel" aria-label="Flight parameters">
+  <!-- ============ LEFT: PAYLOAD / BALLOON / GAS ============ -->
+  <section class="panel input-panel" aria-label="Payload and balloon parameters">
 
     <div class="field-group">
       <h2><span class="idx">01</span> Payload</h2>
@@ -49,22 +52,12 @@
     <div class="field-group">
       <h2><span class="idx">02</span> Balloon</h2>
       <label for="balloonType">Balloon type</label>
-      <select id="balloonType">
-        <option value="qualatex-9" data-weight="9" selected>Qualatex 9 g (latex party balloon)</option>
-        <option value="totex-100" data-weight="100">Totex/Hwoyee 100 g</option>
-        <option value="totex-200" data-weight="200">Totex/Hwoyee 200 g</option>
-        <option value="totex-300" data-weight="300">Totex/Hwoyee 300 g</option>
-        <option value="totex-350" data-weight="350">Totex/Hwoyee 350 g</option>
-        <option value="totex-500" data-weight="500">Totex/Hwoyee 500 g</option>
-        <option value="totex-600" data-weight="600">Totex/Hwoyee 600 g</option>
-        <option value="totex-800" data-weight="800">Totex/Hwoyee 800 g</option>
-        <option value="totex-1000" data-weight="1000">Totex/Hwoyee 1000 g</option>
-        <option value="totex-1200" data-weight="1200">Totex/Hwoyee 1200 g</option>
-        <option value="totex-1500" data-weight="1500">Totex/Hwoyee 1500 g</option>
-        <option value="totex-2000" data-weight="2000">Totex/Hwoyee 2000 g</option>
-        <option value="totex-3000" data-weight="3000">Totex/Hwoyee 3000 g</option>
-        <option value="custom" data-weight="9">Custom…</option>
-      </select>
+      <select id="balloonType"></select>
+      <div class="row-inline preset-actions">
+        <button type="button" id="addPresetBtn" class="btn-secondary">+ Add preset</button>
+        <button type="button" id="editPresetBtn" class="btn-secondary">Edit</button>
+        <button type="button" id="deletePresetBtn" class="btn-secondary">Delete</button>
+      </div>
       <div class="row-2">
         <div>
           <label for="balloonWeight">Balloon weight (g)</label>
@@ -91,6 +84,27 @@
       <input type="number" id="gasLift" value="0.90" min="0.1" step="0.01">
       <p class="hint">Ballongas is a helium/air blend; exact lift depends on mix ratio &mdash; adjust if your supplier states a different value.</p>
     </div>
+  </section>
+
+  <!-- ============ RIGHT: MAP + LAUNCH SITE/TIME + FLIGHT PROFILE ============ -->
+  <section class="panel map-panel" aria-label="Map and flight setup">
+    <div id="map"></div>
+
+    <div class="map-legend">
+      <span><i class="dot launch"></i> Launch</span>
+      <span><i class="dot release"></i> Burst / release</span>
+      <span><i class="dot land"></i> Landing</span>
+      <div class="search-mode-toggle" role="radiogroup" aria-label="Map click mode">
+        <label class="toggle-opt">
+          <input type="radio" name="searchMode" value="forward" checked>
+          <span>Forward: click sets launch, predicts landing</span>
+        </label>
+        <label class="toggle-opt">
+          <input type="radio" name="searchMode" value="backward">
+          <span>Backward: click sets desired landing, solves launch</span>
+        </label>
+      </div>
+    </div>
 
     <div class="field-group">
       <h2><span class="idx">04</span> Launch site &amp; time</h2>
@@ -100,6 +114,7 @@
         <button type="button" id="searchBtn" class="btn-secondary">Find</button>
         <button type="button" id="geolocateBtn" class="btn-secondary" title="Use current device position">⦿ My position</button>
       </div>
+      <div class="status-box" id="searchStatus"></div>
       <div class="row-2">
         <div>
           <label for="launchLat">Latitude</label>
@@ -110,7 +125,6 @@
           <input type="number" id="launchLon" value="8.5417" step="0.0001">
         </div>
       </div>
-      <p class="hint">Or click directly on the map to set the launch site.</p>
       <div class="row-2">
         <div>
           <label for="launchDate">Launch date (UTC)</label>
@@ -121,6 +135,18 @@
           <input type="time" id="launchTime" step="60">
         </div>
       </div>
+      <label for="weatherModel">Weather model</label>
+      <select id="weatherModel">
+        <option value="" selected>Best match (automatic blend)</option>
+        <option value="gfs_seamless">GFS (NOAA, global)</option>
+        <option value="icon_seamless">ICON (DWD, global/Europe)</option>
+        <option value="ecmwf_ifs025">ECMWF IFS 0.25°</option>
+        <option value="gem_seamless">GEM (Environment Canada)</option>
+        <option value="meteofrance_seamless">ARPEGE/AROME (Météo-France)</option>
+        <option value="ukmo_seamless">UKMO (UK Met Office)</option>
+        <option value="jma_seamless">JMA (Japan Meteorological Agency)</option>
+      </select>
+      <p class="hint">Not every model publishes the same set of pressure levels &mdash; if a level is missing for the chosen model, the app falls back to the nearest available one.</p>
     </div>
 
     <div class="field-group">
@@ -152,19 +178,17 @@
     <p class="hint" id="calcError" role="alert"></p>
   </section>
 
-  <!-- ============ MAP + RESULTS ============ -->
-  <section class="panel map-panel" aria-label="Map and trajectory">
-    <div id="map"></div>
-    <div class="map-legend">
-      <span><i class="dot launch"></i> Launch</span>
-      <span><i class="dot release"></i> Burst / release</span>
-      <span><i class="dot land"></i> Landing</span>
-      <span class="map-hint">Shift‑click the map to set a desired landing point and back‑calculate the launch site.</span>
+  <!-- ============ RESULTS (full width) ============ -->
+  <section class="panel results-panel" aria-label="Calculation results" id="resultsPanel">
+    <div class="results-header">
+      <h2><span class="idx">06</span> Results</h2>
+      <div class="export-actions">
+        <button type="button" id="exportJsonBtn" class="btn-secondary">⭳ Save (JSON)</button>
+        <button type="button" id="printBtn" class="btn-secondary">🖶 Print</button>
+        <button type="button" id="copyLinkBtn" class="btn-secondary">🔗 Copy link</button>
+        <button type="button" id="exportImageBtn" class="btn-secondary">🖼 Export image</button>
+      </div>
     </div>
-  </section>
-
-  <section class="panel results-panel" aria-label="Calculation results">
-    <h2><span class="idx">06</span> Results</h2>
 
     <div class="result-grid">
       <div class="result-card">
@@ -203,6 +227,10 @@
         <span class="label">Landing distance from launch</span>
         <span class="value" id="resDistance">—</span>
       </div>
+      <div class="result-card wide">
+        <span class="label">Weather data used</span>
+        <span class="value" id="resWeatherSource">—</span>
+      </div>
     </div>
 
     <div class="profile-wrap">
@@ -217,6 +245,7 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
