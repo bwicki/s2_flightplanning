@@ -110,7 +110,9 @@ body.day .place-chip{background:rgba(255,255,255,0.9);color:#16202a;border-color
 .map-controls-stack .center-map-btn{position:static;width:56px;height:40px;background:transparent;border:none;border-bottom:1px solid var(--border);border-radius:0;box-shadow:none;font-size:18px;cursor:pointer;color:var(--text);display:flex;align-items:center;justify-content:center;}
 .map-controls-stack .center-map-btn:last-of-type{border-bottom:none;}
 .center-map-btn:active{transform:scale(0.93);}
-#particleHeightSliderWrap{display:none;flex-direction:column;align-items:center;width:56px;box-sizing:border-box;padding:10px 0 9px;border-bottom:1px solid var(--border);}
+#particleHeightSliderWrap{display:none;flex-direction:column;align-items:center;width:56px;box-sizing:border-box;padding:10px 0 9px;border-bottom:1px solid var(--border);position:relative;}
+#particleWindPreview{position:absolute;right:100%;top:50%;transform:translateY(-50%);margin-right:8px;background:rgba(30,34,40,0.92);border:1px solid var(--border);border-radius:6px;padding:5px 8px;display:none;align-items:center;gap:5px;white-space:nowrap;font-size:11px;color:#fff;pointer-events:none;}
+#particleWindPreview.show{display:flex;}
 #particleHeightSliderWrap.show{display:flex;}
 #particleHeightSliderTrack{position:relative;width:4px;height:100px;background:var(--border);border-radius:2px;margin:0 auto;touch-action:none;}
 #particleHeightSliderFill{position:absolute;bottom:0;left:0;width:100%;background:var(--accent);border-radius:2px;}
@@ -128,7 +130,6 @@ body.day .place-chip{background:rgba(255,255,255,0.9);color:#16202a;border-color
 .legend-row{display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;}
 
 /* ---- test mode caution bar ---- */
-#testCautionBar{display:none;background:var(--bad);color:#fff;text-align:center;font-weight:800;font-size:13px;letter-spacing:1px;padding:6px;flex-shrink:0;}
 #testCautionBar.show{display:block;}
 
 /* ---- main layout ---- */
@@ -219,6 +220,8 @@ canvas.mini-half{width:100% !important;height:110px !important;cursor:zoom-in;}
 .chart-thumb-title{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:2px;}
 .chart-expand-btn{background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:5px;width:20px;height:20px;font-size:11px;cursor:pointer;line-height:1;}
 #hodographChart{aspect-ratio:1/1;height:auto !important;}
+.map-scale-bar{position:absolute;right:56px;bottom:12px;background:rgba(30,34,40,0.82);border-radius:6px;padding:4px 8px;pointer-events:none;font-size:10px;color:#fff;display:flex;flex-direction:column;gap:1px;}
+.map-scale-line{height:3px;background:#fff;border:1px solid #222;border-top:none;margin-top:1px;}
 #chartExpandOverlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:5000;display:none;align-items:center;justify-content:center;}
 #tutorialOverlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:5500;display:none;align-items:center;justify-content:center;}
 #tutorialOverlay.show{display:flex;}
@@ -291,6 +294,7 @@ canvas.mini-half{width:100% !important;height:110px !important;cursor:zoom-in;}
       <option value="ft">ft</option>
       <option value="FL">FL</option>
     </select>
+    <button class="ltbtn" id="tgFlightCharts" title="Show/hide Flight Charts"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 19V10M10 19V5M16 19v-7M22 19H2"/></svg></button>
     <button class="iconbtn" id="btnDayNight" title="Day/Night">
       <svg id="iconSun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
       <svg id="iconMoon" width="17" height="17" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/></svg>
@@ -374,11 +378,10 @@ canvas.mini-half{width:100% !important;height:110px !important;cursor:zoom-in;}
           <label><input type="checkbox" data-as="G">Class G</label>
           <label><input type="checkbox" checked data-as="R">Restricted</label>
           <label><input type="checkbox" checked data-as="P">Prohibited</label>
-          <label><input type="checkbox" checked data-as="TMZ">TMZ</label>
-          <label><input type="checkbox" checked data-as="RMZ">RMZ</label>
+          <label><input type="checkbox" data-as="TMZ">TMZ</label>
+          <label><input type="checkbox" data-as="RMZ">RMZ</label>
         </div>
-        <p style="font-size:10px;color:var(--muted);margin:8px 0 0;">Draws real airspace boundaries (openAIP Core API) filtered to the checked classes/types, as an overlay on top of the general airspace image layer.</p>
-        <p style="font-size:10px;color:var(--muted);margin:6px 0 0;">openAIP key is fixed in code (not editable here) to avoid accidental changes.</p>
+        <p style="font-size:10px;color:var(--bad);margin:8px 0 0;">⚠ Not currently functional: openAIP's Core API (needed for real per-class filtering) blocks browser requests via CORS, so the ✈️ layer always shows the single combined raster image regardless of these checkboxes. Left here for when/if that becomes possible.</p>
 
         <hr>
         <div class="subhead">Offline Tile Cache Radius</div>
@@ -500,12 +503,12 @@ canvas.mini-half{width:100% !important;height:110px !important;cursor:zoom-in;}
     <button class="iconbtn" id="btnTestMode" title="Test Mode">Test Mode</button>
     <input type="checkbox" id="testEnable" style="display:none;">
   </div>
-  <div id="testCautionBar">⚠ CAUTION: TEST MODE ⚠</div>
 
   <div id="main">
     <div id="mapwrap">
       <div id="map"></div>
       <div id="topAlertStack">
+        <div id="testCautionBar" class="gps-warn" style="font-weight:800;letter-spacing:1px;justify-content:center;"><span>⚠ CAUTION: TEST MODE ⚠</span></div>
         <div id="warnbar"><span id="warnbarText"></span><button class="banner-close" style="margin-left:auto;" onclick="dismissBanner('warnbar','warnbarIcon')">✕</button></div>
         <div id="descentWindWarnBar" class="yellow-warn"><span id="descentWindWarnText"></span><button class="banner-close" style="margin-left:auto;" onclick="dismissBanner('descentWindWarnBar','descentWindWarnIcon')">✕</button></div>
         <div id="gpsWarnBar" class="gps-warn">
@@ -532,6 +535,10 @@ canvas.mini-half{width:100% !important;height:110px !important;cursor:zoom-in;}
           <div id="particleHeightSliderTrack" class="custom-vslider-track">
             <div id="particleHeightSliderFill" class="custom-vslider-fill"></div>
             <div id="particleHeightSliderThumb" class="custom-vslider-thumb"></div>
+            <div id="particleWindPreview">
+              <svg id="particleWindPreviewArrow" width="14" height="14" viewBox="0 0 24 24"><path d="M12 2 L18 22 L12 17 L6 22 Z" fill="#00e5c8"/></svg>
+              <span id="particleWindPreviewText">—</span>
+            </div>
           </div>
           <div id="particleHeightLabel">+100m<br>AGL</div>
         </div>
@@ -576,14 +583,18 @@ canvas.mini-half{width:100% !important;height:110px !important;cursor:zoom-in;}
         <div class="cardbody">
           <div class="datagrid">
             <div class="datacell wide" id="posDisplayWrap">
-              <div class="val small" id="posDMS">—</div>
-              <div class="val small" id="posCompact" style="margin-top:2px;color:var(--muted);">—</div>
-              <div class="val small" id="posNearestTown" style="margin-top:2px;color:var(--muted);font-size:11px;">—</div>
-              <div class="val small" id="posManualHint" style="display:none;color:var(--warn);">📍 Click on Position</div>
+              <div style="display:flex;justify-content:space-between;gap:8px;">
+                <div>
+                  <div class="val small" id="posDMS" style="font-weight:400;">—</div>
+                  <div class="val small" id="posCompact" style="margin-top:2px;color:var(--muted);font-weight:400;">—</div>
+                </div>
+                <div class="val small" id="posNearestTown" style="color:var(--muted);font-size:11px;text-align:right;">—</div>
+              </div>
+              <div class="val small" id="posManualHint" style="display:none;color:var(--warn);margin-top:2px;">📍 Click on Position</div>
             </div>
             <div class="datacell">
               <label id="altAMSLLabel">Alt AMSL (GPS)</label>
-              <div class="val" id="altAMSL">—</div>
+              <div class="val small" id="altAMSL">—</div>
               <div class="stepper-input-row" id="altAMSLInputRow" style="display:none;">
                 <input type="number" class="manual-input" id="altAMSLInput" placeholder="m AMSL">
                 <div class="input-steppers">
@@ -592,10 +603,10 @@ canvas.mini-half{width:100% !important;height:110px !important;cursor:zoom-in;}
                 </div>
               </div>
             </div>
-            <div class="datacell"><label>Alt AGL</label><div class="val" id="altAGL">—</div></div>
+            <div class="datacell"><label>Alt AGL</label><div class="val small" id="altAGL">—</div></div>
             <div class="datacell">
               <label id="courseLabel">Course (° True GPS)</label>
-              <div class="val" id="courseVal">—</div>
+              <div class="val small" id="courseVal">—</div>
               <div class="stepper-input-row" id="courseInputRow" style="display:none;">
                 <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" class="manual-input" id="courseValInput" placeholder="090">
                 <div class="input-steppers">
@@ -606,7 +617,7 @@ canvas.mini-half{width:100% !important;height:110px !important;cursor:zoom-in;}
             </div>
             <div class="datacell">
               <label id="speedLabel">Speed (GPS)</label>
-              <div class="val" id="speedVal">—</div>
+              <div class="val small" id="speedVal">—</div>
               <div class="stepper-input-row" id="speedValInputRow" style="display:none;">
                 <input type="text" inputmode="decimal" class="manual-input" id="speedValInput" placeholder="kn">
                 <div class="input-steppers">
@@ -627,8 +638,13 @@ canvas.mini-half{width:100% !important;height:110px !important;cursor:zoom-in;}
           <div class="datagrid">
             <div class="datacell wide" id="landingPosDisplayWrap">
               <label>Approx Position</label>
-              <div class="val small" id="landingPosCoords">—</div>
-              <div class="val small" id="landingPosTown" style="margin-top:2px;color:var(--muted);">—</div>
+              <div style="display:flex;justify-content:space-between;gap:8px;">
+                <div>
+                  <div class="val small" id="landingPosDMS" style="font-weight:400;">—</div>
+                  <div class="val small" id="landingPosCoords" style="margin-top:2px;color:var(--muted);font-weight:400;">—</div>
+                </div>
+                <div class="val small" id="landingPosTown" style="color:var(--muted);text-align:right;">—</div>
+              </div>
             </div>
             <div class="datacell"><label>Approx Height</label><div class="val small" id="landingPosAlt">—</div></div>
             <div class="datacell">
@@ -644,8 +660,8 @@ canvas.mini-half{width:100% !important;height:110px !important;cursor:zoom-in;}
               <div class="val small" id="estimatedDescentPointText">—</div>
             </div>
             <div class="datacell wide" id="inversionNote" style="display:none;">
-              <label>Inversion / Isothermal Layer</label>
-              <div class="val small" id="inversionNoteText" style="color:var(--accent2);">—</div>
+              <label>Inversion/Isothermal Layer below Descent Position</label>
+              <div class="val small" id="inversionNoteText">(none)</div>
             </div>
           </div>
           <button class="ghost" id="btnClearPlannedArea" style="display:none;margin-top:6px;color:var(--bad);">Clear planned landing area</button>
@@ -685,7 +701,7 @@ canvas.mini-half{width:100% !important;height:110px !important;cursor:zoom-in;}
       <!-- WIND PROFILE + DESCENT HODOGRAPH, side by side as thumbnails - click
            either to open it larger with a close button, per request. The
            hodograph thumbnail is shown/hidden via the header toggle button. -->
-      <div class="card collapsed">
+      <div class="card collapsed" id="flightChartsCard" style="display:none;">
         <h3 onclick="toggleCard(this)">Flight Charts <span class="chev">▾</span></h3>
         <div class="cardbody" style="display:flex;gap:8px;">
           <div style="flex:1;min-width:0;">
@@ -718,7 +734,7 @@ canvas.mini-half{width:100% !important;height:110px !important;cursor:zoom-in;}
           </ul>
           <p style="font-size:12px;color:var(--warn);margin:10px 0 0;font-weight:600;">⚠ Fill in Settings first - your aircraft registration, pilot contact numbers, and SMS/email recipients all need to be set up there before the emergency button can send a useful report.</p>
           <div style="display:flex;gap:6px;margin-top:12px;">
-            <button class="ghost" style="flex:1;" onclick="dismissTutorial(); document.getElementById('btnSettings').click();">Open Settings</button>
+            <button class="ghost" style="flex:1;" onclick="dismissTutorial(); setTimeout(()=>document.getElementById('btnSettings').click(), 0);">Open Settings</button>
             <button class="ghost" style="flex:1;" onclick="dismissTutorial()">Got it</button>
           </div>
         </div>
@@ -784,7 +800,7 @@ if(!(window.crypto && crypto.subtle && crypto.subtle.digest)){
 
 // ---------- version ----------
 // Increment APP_VERSION on every revision and keep APP_DATE current (dd.mm.yyyy).
-const APP_VERSION = 'v60';
+const APP_VERSION = 'v61';
 const APP_DATE = '29.07.2026';
 document.getElementById('versionChip').textContent = APP_VERSION + ' · ' + APP_DATE;
 
@@ -860,6 +876,42 @@ function isoDensity(altM){
 // ---------- map setup ----------
 const map = L.map('map', {zoomControl:false, attributionControl:true}).setView([state.lat,state.lon], 11);
 L.control.zoom({position:'bottomright'}).addTo(map);
+// Custom scale bar (km AND nautical miles - Leaflet's built-in control only
+// offers metric/imperial, not nm) - positioned via CSS to sit to the LEFT
+// of the zoom buttons, which share the same corner.
+const ScaleBarControl = L.Control.extend({
+  options: {position:'bottomright'},
+  onAdd: function(){
+    const div = L.DomUtil.create('div', 'map-scale-bar');
+    div.innerHTML = '<div class="map-scale-line" id="scaleBarLineKm"></div><div class="map-scale-label" id="scaleBarLabelKm">—</div>'+
+                     '<div class="map-scale-line" id="scaleBarLineNm"></div><div class="map-scale-label" id="scaleBarLabelNm">—</div>';
+    return div;
+  }
+});
+new ScaleBarControl().addTo(map);
+function niceScaleNumber(raw){
+  const pow10 = Math.pow(10, Math.floor(Math.log10(raw)));
+  const frac = raw/pow10;
+  const nice = frac>=5 ? 5 : frac>=2 ? 2 : 1;
+  return nice*pow10;
+}
+function updateScaleBar(){
+  const y = map.getSize().y/2;
+  const maxWidthPx = 90;
+  const p1 = map.containerPointToLatLng([0,y]);
+  const p2 = map.containerPointToLatLng([maxWidthPx,y]);
+  const maxMeters = haversine(p1.lat,p1.lng,p2.lat,p2.lng);
+  const niceKm = niceScaleNumber(maxMeters/1000);
+  const pxPerKm = maxWidthPx/(maxMeters/1000);
+  document.getElementById('scaleBarLineKm').style.width = Math.round(niceKm*pxPerKm)+'px';
+  document.getElementById('scaleBarLabelKm').textContent = (niceKm<1? (niceKm*1000).toFixed(0)+' m' : niceKm+' km');
+  const niceNm = niceScaleNumber(maxMeters/1852);
+  const pxPerNm = maxWidthPx/(maxMeters/1852);
+  document.getElementById('scaleBarLineNm').style.width = Math.round(niceNm*pxPerNm)+'px';
+  document.getElementById('scaleBarLabelNm').textContent = niceNm+' nm';
+}
+map.on('zoomend moveend', updateScaleBar);
+updateScaleBar();
 
 // Dedicated pane, above any base tile layer regardless of which one is
 // active or when it was (re-)added - this is what fixes roads/place-name
@@ -1077,6 +1129,28 @@ function updateCacheBoundaryCircle(){
   if(!lastCachedCenter) return;
   cacheBoundaryCircle.setLatLng([lastCachedCenter.lat, lastCachedCenter.lon]);
   cacheBoundaryCircle.setRadius(cacheRadiusKm*1000);
+  updateCacheMask();
+}
+// Grey out everything OUTSIDE the cached area - a world-covering polygon
+// with the cache circle cut out as a hole, so only the pre-cached region
+// stays clearly visible once zoomed out.
+function circleToRing(centerLat, centerLon, radiusM, points){
+  points = points || 72;
+  const ring = [];
+  for(let i=0;i<=points;i++){
+    const angle = (i/points)*2*Math.PI;
+    const dLat = (radiusM/111320)*Math.cos(angle);
+    const dLon = (radiusM/(111320*Math.cos(centerLat*Math.PI/180)||1))*Math.sin(angle);
+    ring.push([centerLat+dLat, centerLon+dLon]);
+  }
+  return ring;
+}
+const cacheMaskLayer = L.polygon([], {stroke:false, fillColor:'#0a0e14', fillOpacity:0.55, interactive:false});
+function updateCacheMask(){
+  if(!lastCachedCenter) return;
+  const outerRing = [[-89,-179],[-89,179],[89,179],[89,-179]];
+  const holeRing = circleToRing(lastCachedCenter.lat, lastCachedCenter.lon, cacheRadiusKm*1000);
+  cacheMaskLayer.setLatLngs([outerRing, holeRing]);
 }
 function updateCacheBoundaryCircleVisibility(){
   // Only show once the map is zoomed out enough that the ring would be a
@@ -1088,6 +1162,8 @@ function updateCacheBoundaryCircleVisibility(){
   const shouldShow = halfWidthKm > cacheRadiusKm*0.5;
   if(shouldShow && !map.hasLayer(cacheBoundaryCircle)) cacheBoundaryCircle.addTo(map);
   else if(!shouldShow && map.hasLayer(cacheBoundaryCircle)) map.removeLayer(cacheBoundaryCircle);
+  if(shouldShow){ updateCacheMask(); if(!map.hasLayer(cacheMaskLayer)) cacheMaskLayer.addTo(map); }
+  else if(map.hasLayer(cacheMaskLayer)) map.removeLayer(cacheMaskLayer);
 }
 map.on('zoomend moveend', updateCacheBoundaryCircleVisibility);
 // ---- fine, class-styled roads (Satellite view only) ----
@@ -1452,6 +1528,20 @@ const plannedLandingPolyLayer = L.polygon([], {color:'#ff8a00', weight:3, dashAr
 // descent - kept visually distinct, same idea as the live projection in
 // function 1 (teal cruise / yellow descent), just in the planning colors.
 const plannedCruiseSegmentLayer = L.polyline([], {color:'#00e5c8', weight:4, dashArray:'5,6', lineCap:'round', opacity:1});
+// A long (360 min) reference trajectory at the CURRENT cruise altitude,
+// shown only in Plan Descent - helps judge which areas are even reachable
+// before committing to a specific target point. Purely informational: it
+// does NOT trigger any auto-zoom, unlike the actual planned-area result.
+const referenceTrajectoryLayer = L.polyline([], {color:'#8b98a5', weight:2, dashArray:'2,6', opacity:0.8, interactive:false});
+function computeReferenceTrajectory(){
+  const rate1 = parseFloat(document.getElementById('sRate').value);
+  const interceptAGL = parseFloat(document.getElementById('sIntH').value);
+  const rate2 = parseFloat(document.getElementById('sRate2').value);
+  const REFERENCE_MINUTES = 360;
+  const path = simulateDescentPath(state.lat, state.lon, state.altAMSL, 0, REFERENCE_MINUTES*60, rate1, interceptAGL, rate2, 0);
+  const cruiseOnly = path.filter(p=>p.t <= REFERENCE_MINUTES*60);
+  referenceTrajectoryLayer.setLatLngs(cruiseOnly.map(p=>[p.lat,p.lon]));
+}
 const plannedDescentPathLayer = L.polyline([], {color:'#b026ff', weight:3, dashArray:'8,6', lineCap:'round'});
 
 // ---------- GPS ----------
@@ -1657,23 +1747,26 @@ function renderSidebarPosition(){
 // ---- detect an inversion or isothermal layer below the current (descent)
 // position, using the model's temperature-by-altitude data ----
 function detectInversionOrIsothermal(profile, belowAltM){
-  if(!profile) return null;
+  if(!profile) return [];
   const levels = profile.filter(p=>p.temp_c!=null && p.alt_m<=belowAltM).sort((a,b)=>b.alt_m-a.alt_m); // top-down, from just below current alt to ground
+  const found = [];
   for(let i=0;i<levels.length-1;i++){
     const upper = levels[i], lower = levels[i+1]; // upper.alt_m > lower.alt_m
     const dT = upper.temp_c - lower.temp_c; // normally negative (colder higher up)
-    if(dT > 0.3) return {type:'inversion', altM: upper.alt_m};
-    if(Math.abs(dT) <= 0.3) return {type:'isothermal', altM: upper.alt_m};
+    if(dT > 0.3 || Math.abs(dT) <= 0.3) found.push(upper.alt_m);
   }
-  return null;
+  return found;
 }
 function updateInversionNote(){
   const el = document.getElementById('inversionNote');
-  const found = detectInversionOrIsothermal(getActiveWindProfile(), state.altAMSL);
-  if(!found){ el.style.display = 'none'; return; }
-  const agl = Math.round(found.altM - state.groundElev);
-  const label = found.type==='inversion' ? 'Inversion below descent position' : 'Isothermal layer below descent position';
-  document.getElementById('inversionNoteText').textContent = `⚠ ${label}: ${Math.round(found.altM)} m AMSL / ${agl} m AGL`;
+  const foundAlts = detectInversionOrIsothermal(getActiveWindProfile(), state.altAMSL);
+  if(!foundAlts.length){
+    document.getElementById('inversionNoteText').textContent = '(none)';
+  } else {
+    document.getElementById('inversionNoteText').textContent = foundAlts
+      .map(altM=>`${Math.round(altM)} mAMSL (${Math.round(altM-state.groundElev)} mAGL)`)
+      .join('  ');
+  }
   el.style.display = 'block';
 }
 
@@ -2149,6 +2242,7 @@ function updateLandingPositionCard(){
   if(!state.landingPolygon || !state.landingPolygon.length) return;
   const lats = state.landingPolygon.map(p=>p[1]), lons = state.landingPolygon.map(p=>p[0]);
   const cLat = lats.reduce((a,b)=>a+b,0)/lats.length, cLon = lons.reduce((a,b)=>a+b,0)/lons.length;
+  document.getElementById('landingPosDMS').textContent = toDMS(cLat,true)+' '+toDMS(cLon,false);
   document.getElementById('landingPosCoords').textContent = toCompact(cLat, cLon);
 
   // Ground wind at the landing site, evaluated at the estimated landing time.
@@ -2211,7 +2305,7 @@ function updateAdiabaticReadout(rate1, interceptAGL){
   const startAlt = state.altAMSL; // balloon assumed in equilibrium at the current altitude
   const { liftBonusKg } = adiabaticVolumeAndLift(balloonVolumeM3, startAlt, interceptAlt, rate1);
   const actualRate = computeActualRateAtIntercept(balloonVolumeM3, startAlt, interceptAlt, rate1);
-  document.getElementById('lblAdiaRateBadge').textContent = `real: ~${actualRate.toFixed(1)}m/s  ${liftBonusKg.toFixed(1)}kg lift`;
+  document.getElementById('lblAdiaRateBadge').textContent = `real: ~${actualRate.toFixed(3)}m/s  ${liftBonusKg.toFixed(1)}kg lift`;
 }
 
 function checkObstacleWarnings(path){
@@ -2384,6 +2478,20 @@ function spawnGroundWindParticle(){
 }
 let particleHeightAGL = 100;
 let particleHeightMaxAGL = 1200;
+let particleWindPreviewTimer = null;
+function showParticleWindPreview(){
+  const particleAltM = state.groundElev + particleHeightAGL;
+  const hourIdx = Math.round((state.secondsToLanding||0)/3600);
+  const w = windAt(particleAltM, 0, 1, hourIdx);
+  const speedKmh = Math.hypot(w.u,w.v)*3.6;
+  const dirFrom = (Math.atan2(-w.u,-w.v)*180/Math.PI+360)%360;
+  document.getElementById('particleWindPreviewText').textContent = `${Math.round(dirFrom)}° ${speedKmh.toFixed(1)}km/h`;
+  document.getElementById('particleWindPreviewArrow').style.transform = `rotate(${(dirFrom+180)%360}deg)`;
+  const preview = document.getElementById('particleWindPreview');
+  preview.classList.add('show');
+  clearTimeout(particleWindPreviewTimer);
+  particleWindPreviewTimer = setTimeout(()=>preview.classList.remove('show'), 10000);
+}
 function updateParticleHeightUI(){
   const frac = Math.max(0, Math.min(1, particleHeightAGL/particleHeightMaxAGL));
   document.getElementById('particleHeightSliderFill').style.height = (frac*100)+'%';
@@ -2398,6 +2506,7 @@ function updateParticleHeightUI(){
     const frac = Math.max(0, Math.min(1, (rect.bottom-clientY)/rect.height)); // bottom = 0 (ground), top = max
     particleHeightAGL = Math.round((frac*particleHeightMaxAGL)/10)*10;
     updateParticleHeightUI();
+    showParticleWindPreview();
   }
   let dragging = false;
   track.addEventListener('pointerdown', e=>{ dragging=true; track.setPointerCapture(e.pointerId); setFromClientY(e.clientY); });
@@ -2574,6 +2683,8 @@ function setAppMode(mode){
     if(map.hasLayer(predictedCruiseLayer)) map.removeLayer(predictedCruiseLayer);
     if(map.hasLayer(predictedDescentSegmentLayer)) map.removeLayer(predictedDescentSegmentLayer);
     if(map.hasLayer(descentInitMarker)) map.removeLayer(descentInitMarker);
+    computeReferenceTrajectory();
+    referenceTrajectoryLayer.addTo(map);
   } else {
     // Back to monitor mode: restore the live landing area + live yellow
     // projection, and go back to showing LIVE data in the "Projected
@@ -2586,6 +2697,7 @@ function setAppMode(mode){
     predictedCruiseLayer.addTo(map);
     predictedDescentSegmentLayer.addTo(map);
     descentInitMarker.addTo(map);
+    if(map.hasLayer(referenceTrajectoryLayer)) map.removeLayer(referenceTrajectoryLayer);
     if(intendedLandingMarker){ map.removeLayer(intendedLandingMarker); intendedLandingMarker=null; }
     if(map.hasLayer(plannedDescentInitMarker)) map.removeLayer(plannedDescentInitMarker);
     if(map.hasLayer(plannedCruiseSegmentLayer)) map.removeLayer(plannedCruiseSegmentLayer);
@@ -2866,6 +2978,7 @@ document.getElementById('btnCenterPlanned').addEventListener('click', ()=>{
 // instead of the live/current descent projection ----
 async function updatePlannedLandingPositionCard(cLat, cLon, hourIdx){
   if(!(state.appMode==='plan' && state.plannedLandingActive)) return; // mode changed while this was computing
+  document.getElementById('landingPosDMS').textContent = toDMS(cLat,true)+' '+toDMS(cLon,false);
   document.getElementById('landingPosCoords').textContent = toCompact(cLat, cLon);
   const w = windAt(state.groundElev+50, 0, 1, hourIdx);
   const speedKmh = Math.hypot(w.u,w.v)*3.6;
@@ -3115,6 +3228,11 @@ function toggleCard(h3){
     setTimeout(()=>window.dispatchEvent(new Event('resize')), 50);
   }
 }
+document.getElementById('tgFlightCharts').addEventListener('click', function(){
+  const showing = this.classList.toggle('active');
+  document.getElementById('flightChartsCard').style.display = showing ? 'block' : 'none';
+  if(showing) setTimeout(()=>window.dispatchEvent(new Event('resize')), 50);
+});
 
 // ---------- header popovers (settings + test mode) ----------
 function setupPopover(btnId, panelId){
@@ -4028,7 +4146,7 @@ requestWakeLock();
 // ---------- save / restore configuration ----------
 const CONFIG_INPUT_IDS = ['sInit','sRate','sIntH','sRate2','sScatter','sCacheRadius','sBalloonVolume','sBalloonMass','sAdiaVariance','wxModelSelect','altUnitSelect','wxRefreshInterval'];
 const CONFIG_CHECKBOX_IDS = ['overheadOnly'];
-const CONFIG_TOGGLE_BTN_IDS = ['tgPower','tgRoads','tgAirspace','tgGroundWind','tgNatureReserves'];
+const CONFIG_TOGGLE_BTN_IDS = ['tgPower','tgRoads','tgAirspace','tgGroundWind','tgNatureReserves','tgFlightCharts'];
 function saveConfig(){
   try{
     const cfg = {};
