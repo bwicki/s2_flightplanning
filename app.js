@@ -426,13 +426,18 @@ const state = {
   targetMarker: null,
   deviceMarker: null,
   trajectoryLine: null,
+  trajectoryCasing: null,
   lastResult: null,
   busy: false,
 };
 
 function markerStyle(kind) {
-  const colors = { launch: '#59d18f', release: '#ffb020', land: '#ff6b6b', device: '#4fd1c5', target: '#b78cff' };
-  return { radius: 8, color: colors[kind], weight: 2, fillColor: colors[kind], fillOpacity: 0.55 };
+  const colors = { launch: '#3fd06b', release: '#ffb454', land: '#e0483f', device: '#3fd0c9', target: '#b78cff' };
+  return {
+    radius: 10, color: '#ffffff', weight: 3,
+    fillColor: colors[kind], fillOpacity: 0.95,
+    className: 'marker-glow',
+  };
 }
 
 function currentMode() {
@@ -441,11 +446,37 @@ function currentMode() {
 }
 
 function initMap() {
-  state.map = L.map('map', { worldCopyJump: true }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 8);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors',
-    maxZoom: 18,
-  }).addTo(state.map);
+  state.map = L.map('map', { worldCopyJump: true, zoomControl: true }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 8);
+
+  // Base layers + always-visible radio control, top-right (cockpit idiom)
+  const baseLayers = {
+    'Streets': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }),
+    'Terrain': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenTopoMap' }),
+    'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '© Esri' }),
+    'Light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd', attribution: '© OpenStreetMap, © CARTO' }),
+  };
+  baseLayers['Streets'].addTo(state.map);
+  let activeBaseLayerName = 'Streets';
+  const BaseLayerRadioControl = L.Control.extend({
+    options: { position: 'topright' },
+    onAdd: function () {
+      const div = L.DomUtil.create('div', 'base-layer-radio');
+      div.innerHTML = Object.keys(baseLayers).map(name =>
+        `<label><input type="radio" name="baseLayerRadio" value="${name}" ${name === 'Streets' ? 'checked' : ''}><span>${name}</span></label>`
+      ).join('');
+      L.DomEvent.disableClickPropagation(div);
+      div.querySelectorAll('input').forEach(input => {
+        input.addEventListener('change', () => {
+          if (!input.checked) return;
+          state.map.removeLayer(baseLayers[activeBaseLayerName]);
+          activeBaseLayerName = input.value;
+          baseLayers[activeBaseLayerName].addTo(state.map);
+        });
+      });
+      return div;
+    }
+  });
+  state.map.addControl(new BaseLayerRadioControl());
 
   state.launchMarker = L.circleMarker([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], markerStyle('launch')).addTo(state.map);
 
@@ -457,6 +488,14 @@ function initMap() {
       setLaunchPoint(e.latlng.lat, e.latlng.lng);
     }
   });
+
+  // Force size recompute once flex layout settles (cockpit idiom)
+  const fixMapSize = () => state.map.invalidateSize();
+  window.addEventListener('load', fixMapSize);
+  window.addEventListener('orientationchange', () => setTimeout(fixMapSize, 300));
+  setTimeout(fixMapSize, 50);
+  setTimeout(fixMapSize, 300);
+  if (window.ResizeObserver) new ResizeObserver(fixMapSize).observe(document.getElementById('mapwrap'));
 }
 
 function setLaunchPoint(lat, lon) {
@@ -631,6 +670,8 @@ async function runCalculation() {
   if (state.busy) return;
   state.busy = true;
   $('calcError').textContent = '';
+  const drawer = $('menuDrawer');
+  if (drawer) drawer.classList.add('collapsed');
   setStatus('Fetching weather…', 'wind + pressure levels');
   try {
     const lat = parseFloat($('launchLat').value);
@@ -641,6 +682,8 @@ async function runCalculation() {
     drawTrajectory(r.traj);
     drawProfile(r.traj);
     openResults();
+    const wxSub = $('wxModelSub');
+    if (wxSub) wxSub.textContent = `wx ${r.weather.matchedTime} UTC`;
     setStatus(r.note ? 'Note — see form' : 'Calculation complete', `wx: ${r.weather.matchedTime} UTC`);
   } finally {
     state.busy = false;
@@ -671,12 +714,16 @@ function renderResults(r) {
 }
 
 function drawTrajectory(traj) {
+  if (state.trajectoryCasing) state.map.removeLayer(state.trajectoryCasing);
   if (state.trajectoryLine) state.map.removeLayer(state.trajectoryLine);
   if (state.releaseMarker) state.map.removeLayer(state.releaseMarker);
   if (state.landMarker) state.map.removeLayer(state.landMarker);
 
   const latlngs = traj.path.map(p => [p.lat, p.lon]);
-  state.trajectoryLine = L.polyline(latlngs, { color: '#4fd1c5', weight: 3, opacity: 0.85 }).addTo(state.map);
+  // Dark casing under a bright line (cockpit flightpath idiom): stays legible
+  // over satellite imagery, terrain shading, and light basemaps alike.
+  state.trajectoryCasing = L.polyline(latlngs, { color: '#0a0d10', weight: 8, opacity: 0.75 }).addTo(state.map);
+  state.trajectoryLine = L.polyline(latlngs, { color: '#3fd0c9', weight: 4, opacity: 1, className: 'flightpath-glow' }).addTo(state.map);
 
   const releasePt = traj.path[traj.releaseIdx];
   state.releaseMarker = L.circleMarker([releasePt.lat, releasePt.lon], markerStyle('release')).addTo(state.map)
@@ -686,7 +733,10 @@ function drawTrajectory(traj) {
   state.landMarker = L.circleMarker([land.lat, land.lon], markerStyle('land')).addTo(state.map)
     .bindPopup(`Predicted landing<br>${land.lat.toFixed(4)}, ${land.lon.toFixed(4)}`);
 
-  state.map.fitBounds(state.trajectoryLine.getBounds(), { padding: [30, 30] });
+  // Launch marker on top again for clarity
+  state.launchMarker.bringToFront();
+
+  state.map.fitBounds(state.trajectoryLine.getBounds(), { padding: [40, 40] });
 }
 
 // ---------------------------------------------------------------------
@@ -925,14 +975,68 @@ function wireUI() {
   on('resultsModal', 'click', e => { if (e.target === $('resultsModal')) closeResults(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeResults(); });
 
-  // Sidebar collapse handle (cockpit idiom)
-  on('sidebarHandle', 'click', () => {
-    const sb = $('sidebar');
-    sb.classList.toggle('collapsed');
-    $('sidebarHandle').textContent = sb.classList.contains('collapsed') ? '◀' : '▶';
+  // Hamburger settings drawer
+  const toggleDrawer = (open) => {
+    const d = $('menuDrawer');
+    if (!d) return;
+    if (open === undefined) open = d.classList.contains('collapsed');
+    d.classList.toggle('collapsed', !open);
     setTimeout(() => { if (state.map) state.map.invalidateSize(); }, 280);
+  };
+  on('menuBtn', 'click', () => toggleDrawer());
+  on('menuCloseBtn', 'click', () => toggleDrawer(false));
+  // Open drawer on first load so the user sees the settings once.
+  toggleDrawer(true);
+
+  // Weather model chip + popover (cockpit idiom), synced to hidden select
+  const wxModels = [
+    { v: '', label: 'Best match (auto)' },
+    { v: 'gfs_seamless', label: 'GFS (NOAA)' },
+    { v: 'icon_seamless', label: 'ICON (DWD)' },
+    { v: 'ecmwf_ifs025', label: 'ECMWF IFS 0.25°' },
+    { v: 'gem_seamless', label: 'GEM (Canada)' },
+    { v: 'meteofrance_seamless', label: 'ARPEGE/AROME (MF)' },
+    { v: 'ukmo_seamless', label: 'UKMO' },
+    { v: 'jma_seamless', label: 'JMA' },
+  ];
+  function renderWxPopover() {
+    const pop = $('wxModelPopover');
+    if (!pop) return;
+    const cur = $('weatherModel').value;
+    pop.innerHTML = '';
+    wxModels.forEach(m => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = m.label;
+      if (m.v === cur) b.classList.add('active');
+      b.addEventListener('click', () => {
+        $('weatherModel').value = m.v;
+        const nameEl = $('wxModelName');
+        if (nameEl) nameEl.textContent = m.v ? m.label : 'Best match';
+        const subEl = $('wxModelSub');
+        if (subEl) subEl.textContent = 'tap to change';
+        pop.classList.remove('open');
+      });
+      pop.appendChild(b);
+    });
+  }
+  on("wxModelChip", "click", (e) => {
+    const pop = $('wxModelPopover');
+    if (!pop) return;
+    if (pop.classList.contains('open')) { pop.classList.remove('open'); return; }
+    renderWxPopover();
+    const rect = $('wxModelChip').getBoundingClientRect();
+    pop.style.top = (rect.bottom + 6) + 'px';
+    pop.style.left = Math.max(6, rect.left) + 'px';
+    pop.classList.add('open');
+    e.stopPropagation();
   });
-  if ($('sidebarHandle')) $('sidebarHandle').textContent = '▶';
+  document.addEventListener('click', (e) => {
+    const pop = $('wxModelPopover');
+    if (pop && pop.classList.contains('open') && !pop.contains(e.target) && e.target.closest('#wxModelChip') === null) {
+      pop.classList.remove('open');
+    }
+  });
 
   // Collapsible cards
   document.querySelectorAll('.card > h3').forEach(h => {

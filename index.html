@@ -10,167 +10,190 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 <div id="app">
 
   <!-- ================= TOPBAR ================= -->
   <div id="topbar">
+    <button type="button" id="menuBtn" class="iconbtn" title="Settings menu" aria-label="Open settings menu">☰</button>
     <span class="title">SONDE FLIGHT PLANNING</span>
     <div class="sep"></div>
+
     <div id="modeSwitch" class="mode-toggle" role="radiogroup" aria-label="Map click mode">
       <label><input type="radio" name="searchMode" value="forward" checked><span>⬈ Forward</span></label>
       <label><input type="radio" name="searchMode" value="backward"><span>⬊ Backward</span></label>
     </div>
     <div class="sep"></div>
+
+    <!-- Weather model chip (cockpit idiom): tap to choose model -->
+    <div class="wx-chip" id="wxModelChip" title="Tap to choose a weather model">
+      <div class="wx-chip-line">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+        <b id="wxModelName">Best match</b>
+      </div>
+      <span id="wxModelSub">tap to change</span>
+    </div>
+    <div id="wxModelPopover"></div>
+    <select id="weatherModel" hidden>
+      <option value="" selected>Best match (auto)</option>
+      <option value="gfs_seamless">GFS (NOAA)</option>
+      <option value="icon_seamless">ICON (DWD)</option>
+      <option value="ecmwf_ifs025">ECMWF IFS 0.25°</option>
+      <option value="gem_seamless">GEM (Canada)</option>
+      <option value="meteofrance_seamless">ARPEGE/AROME (MF)</option>
+      <option value="ukmo_seamless">UKMO</option>
+      <option value="jma_seamless">JMA</option>
+    </select>
+    <div class="sep"></div>
+
     <div class="legend-chips">
       <span><i class="dot launch"></i>Launch</span>
       <span><i class="dot release"></i>Burst</span>
       <span><i class="dot land"></i>Landing</span>
       <span><i class="dot target"></i>Target</span>
     </div>
+
     <div class="spacer"></div>
-    <div class="wx-chip" id="statusChip"><b id="statusLine">Ready</b><span id="statusSub">set parameters &amp; calculate</span></div>
+    <div class="wx-chip status" id="statusChip"><b id="statusLine">Ready</b><span id="statusSub">open ☰ to set parameters</span></div>
     <button type="button" id="resultsOpenBtn" class="iconbtn" hidden title="Show results">📊</button>
     <button type="button" id="themeToggle" class="iconbtn" title="Toggle day / night theme">◐</button>
+    <span class="logo-chip"><img src="https://static1.squarespace.com/static/5c603f6f7eb88c2edd690e48/t/5ccdb9f051e58c0001e89503/1556986355383/17_03_17_Wicki_Ballonteam_Logo_RZ.png?format=300w" alt="Wicki Partners Ballonteam" title="Wicki Partners Ballonteam"></span>
   </div>
 
   <!-- ================= MAIN ================= -->
   <div id="main">
     <div id="mapwrap"><div id="map"></div></div>
 
-    <div id="sidebarHandle" title="Show / hide panel">◀</div>
-
-    <div id="sidebar">
-
-      <div class="card">
-        <h3>01 · Payload <span class="chev">▾</span></h3>
-        <div class="cardbody">
-          <div class="frow"><label for="sondeType">Sonde type</label>
-            <select id="sondeType">
-              <option value="sparv-s2" data-weight="9" selected>SparvEmbedded S2 (9 g)</option>
-              <option value="custom" data-weight="9">Custom…</option>
-            </select>
-          </div>
-          <div class="frow"><label for="sondeWeight">Sonde weight (g)</label>
-            <input type="number" id="sondeWeight" value="9" min="1" step="0.5">
-          </div>
-          <div class="frow"><label for="riggingWeight">Rigging etc. (g)</label>
-            <input type="number" id="riggingWeight" value="5" min="0" step="0.5">
-          </div>
-        </div>
+    <!-- ============ SETTINGS DRAWER (hamburger, left) ============ -->
+    <div id="menuDrawer" class="collapsed">
+      <div class="drawer-head">
+        <span>Flight settings</span>
+        <button type="button" id="menuCloseBtn" class="overlay-close" title="Close menu" aria-label="Close settings menu">✕</button>
       </div>
 
-      <div class="card">
-        <h3>02 · Balloon <span class="chev">▾</span></h3>
-        <div class="cardbody">
-          <div class="frow"><label for="balloonType">Balloon type</label>
-            <select id="balloonType"></select>
-          </div>
-          <div class="frow"><label>Presets</label>
-            <div class="btn-row">
-              <button type="button" id="addPresetBtn" class="ghost">+ Add</button>
-              <button type="button" id="editPresetBtn" class="ghost">Edit</button>
-              <button type="button" id="deletePresetBtn" class="ghost">Del</button>
+      <div class="drawer-grid">
+
+        <div class="card">
+          <h3>01 · Payload <span class="chev">▾</span></h3>
+          <div class="cardbody">
+            <div class="frow"><label for="sondeType">Sonde type</label>
+              <select id="sondeType">
+                <option value="sparv-s2" data-weight="9" selected>SparvEmbedded S2 (9 g)</option>
+                <option value="custom" data-weight="9">Custom…</option>
+              </select>
+            </div>
+            <div class="frow"><label for="sondeWeight">Sonde weight (g)</label>
+              <input type="number" id="sondeWeight" value="9" min="1" step="0.5">
+            </div>
+            <div class="frow"><label for="riggingWeight">Rigging etc. (g)</label>
+              <input type="number" id="riggingWeight" value="5" min="0" step="0.5">
             </div>
           </div>
-          <div class="frow"><label for="balloonWeight">Balloon weight (g)</label>
-            <input type="number" id="balloonWeight" value="9" min="1" step="1">
-          </div>
-          <div class="frow"><label for="burstDiameterOverride">Burst Ø override (m)</label>
-            <input type="number" id="burstDiameterOverride" placeholder="auto" min="0.1" step="0.01">
-          </div>
-          <p class="hint" id="burstDiameterHint"></p>
         </div>
-      </div>
 
-      <div class="card">
-        <h3>03 · Fill gas <span class="chev">▾</span></h3>
-        <div class="cardbody">
-          <div class="frow"><label for="gasType">Fill gas</label>
-            <select id="gasType">
-              <option value="ballongas-linde" data-lift="0.90" selected>Ballongas (Linde)</option>
-              <option value="helium" data-lift="1.045">Helium (pure)</option>
-              <option value="hydrogen" data-lift="1.135">Hydrogen</option>
-              <option value="custom" data-lift="0.90">Custom…</option>
-            </select>
-          </div>
-          <div class="frow"><label for="gasLift">Lift (kg/m³ @SL)</label>
-            <input type="number" id="gasLift" value="0.90" min="0.1" step="0.01">
+        <div class="card">
+          <h3>02 · Balloon <span class="chev">▾</span></h3>
+          <div class="cardbody">
+            <div class="frow"><label for="balloonType">Balloon type</label>
+              <select id="balloonType"></select>
+            </div>
+            <div class="frow"><label>Presets</label>
+              <div class="btn-row">
+                <button type="button" id="addPresetBtn" class="ghost">+ Add</button>
+                <button type="button" id="editPresetBtn" class="ghost">Edit</button>
+                <button type="button" id="deletePresetBtn" class="ghost">Del</button>
+              </div>
+            </div>
+            <div class="frow"><label for="balloonWeight">Balloon weight (g)</label>
+              <input type="number" id="balloonWeight" value="9" min="1" step="1">
+            </div>
+            <div class="frow"><label for="burstDiameterOverride">Burst Ø override (m)</label>
+              <input type="number" id="burstDiameterOverride" placeholder="auto" min="0.1" step="0.01">
+            </div>
+            <p class="hint" id="burstDiameterHint"></p>
           </div>
         </div>
-      </div>
 
-      <div class="card">
-        <h3>04 · Launch site &amp; time <span class="chev">▾</span></h3>
-        <div class="cardbody">
-          <div class="frow"><label for="placeSearch">Location</label>
-            <div class="btn-row">
-              <input type="text" id="placeSearch" placeholder="Place name…">
-              <button type="button" id="searchBtn" class="ghost">Find</button>
-              <button type="button" id="geolocateBtn" class="ghost" title="Use current device position">⦿</button>
+        <div class="card">
+          <h3>03 · Fill gas <span class="chev">▾</span></h3>
+          <div class="cardbody">
+            <div class="frow"><label for="gasType">Fill gas</label>
+              <select id="gasType">
+                <option value="ballongas-linde" data-lift="0.90" selected>Ballongas (Linde)</option>
+                <option value="helium" data-lift="1.045">Helium (pure)</option>
+                <option value="hydrogen" data-lift="1.135">Hydrogen</option>
+                <option value="custom" data-lift="0.90">Custom…</option>
+              </select>
+            </div>
+            <div class="frow"><label for="gasLift">Lift (kg/m³ @SL)</label>
+              <input type="number" id="gasLift" value="0.90" min="0.1" step="0.01">
             </div>
           </div>
-          <div class="status-box" id="searchStatus"></div>
-          <div class="frow"><label for="launchLat">Lat / Lon</label>
-            <div class="pair">
-              <input type="number" id="launchLat" value="47.3769" step="0.0001">
-              <input type="number" id="launchLon" value="8.5417" step="0.0001">
+        </div>
+
+        <div class="card">
+          <h3>04 · Launch site &amp; time <span class="chev">▾</span></h3>
+          <div class="cardbody">
+            <div class="frow"><label for="placeSearch">Location</label>
+              <div class="btn-row">
+                <input type="text" id="placeSearch" placeholder="Place name…">
+                <button type="button" id="searchBtn" class="ghost">Find</button>
+                <button type="button" id="geolocateBtn" class="ghost" title="Use current device position">⦿</button>
+              </div>
+            </div>
+            <div class="status-box" id="searchStatus"></div>
+            <div class="frow"><label for="launchLat">Lat / Lon</label>
+              <div class="pair">
+                <input type="number" id="launchLat" value="47.3769" step="0.0001">
+                <input type="number" id="launchLon" value="8.5417" step="0.0001">
+              </div>
+            </div>
+            <div class="frow"><label for="launchDate">Date / time UTC</label>
+              <div class="pair">
+                <input type="date" id="launchDate">
+                <input type="time" id="launchTime" step="60">
+              </div>
             </div>
           </div>
-          <div class="frow"><label for="launchDate">Date / time UTC</label>
-            <div class="pair">
-              <input type="date" id="launchDate">
-              <input type="time" id="launchTime" step="60">
+        </div>
+
+        <div class="card">
+          <h3>05 · Flight profile <span class="chev">▾</span></h3>
+          <div class="cardbody">
+            <div class="frow"><label for="targetMode">Ascent target</label>
+              <select id="targetMode">
+                <option value="altitude" selected>Fixed altitude (m AMSL)</option>
+                <option value="burst">Ascend to burst height</option>
+              </select>
+            </div>
+            <div class="frow" id="targetAltitudeWrap"><label for="targetAltitude">Release alt. (m AMSL)</label>
+              <input type="number" id="targetAltitude" value="5500" min="100" step="100">
+            </div>
+            <div class="frow"><label for="ascentRate">Ascent rate</label>
+              <select id="ascentRate">
+                <option value="1.0">1.0 m/s</option>
+                <option value="1.5">1.5 m/s</option>
+                <option value="2.0">2.0 m/s</option>
+                <option value="2.5" selected>2.5 m/s</option>
+                <option value="3.0">3.0 m/s</option>
+                <option value="3.5">3.5 m/s</option>
+                <option value="4.0">4.0 m/s</option>
+              </select>
+            </div>
+            <div class="frow"><label for="descentRate">Descent rate (m/s @SL)</label>
+              <input type="number" id="descentRate" value="5" min="1" max="15" step="0.5">
             </div>
           </div>
-          <div class="frow"><label for="weatherModel">Weather model</label>
-            <select id="weatherModel">
-              <option value="" selected>Best match (auto)</option>
-              <option value="gfs_seamless">GFS (NOAA)</option>
-              <option value="icon_seamless">ICON (DWD)</option>
-              <option value="ecmwf_ifs025">ECMWF IFS 0.25°</option>
-              <option value="gem_seamless">GEM (Canada)</option>
-              <option value="meteofrance_seamless">ARPEGE/AROME (MF)</option>
-              <option value="ukmo_seamless">UKMO</option>
-              <option value="jma_seamless">JMA</option>
-            </select>
-          </div>
         </div>
-      </div>
 
-      <div class="card">
-        <h3>05 · Flight profile <span class="chev">▾</span></h3>
-        <div class="cardbody">
-          <div class="frow"><label for="targetMode">Ascent target</label>
-            <select id="targetMode">
-              <option value="altitude" selected>Fixed altitude (m AMSL)</option>
-              <option value="burst">Ascend to burst height</option>
-            </select>
-          </div>
-          <div class="frow" id="targetAltitudeWrap"><label for="targetAltitude">Release alt. (m AMSL)</label>
-            <input type="number" id="targetAltitude" value="5500" min="100" step="100">
-          </div>
-          <div class="frow"><label for="ascentRate">Ascent rate</label>
-            <select id="ascentRate">
-              <option value="1.0">1.0 m/s</option>
-              <option value="1.5">1.5 m/s</option>
-              <option value="2.0">2.0 m/s</option>
-              <option value="2.5" selected>2.5 m/s</option>
-              <option value="3.0">3.0 m/s</option>
-              <option value="3.5">3.5 m/s</option>
-              <option value="4.0">4.0 m/s</option>
-            </select>
-          </div>
-          <div class="frow"><label for="descentRate">Descent rate (m/s @SL)</label>
-            <input type="number" id="descentRate" value="5" min="1" max="15" step="0.5">
-          </div>
+        <div class="card calc-card">
+          <button type="button" id="calcBtn" class="primary">Calculate flight</button>
+          <p class="hint err" id="calcError" role="alert"></p>
         </div>
-      </div>
 
-      <button type="button" id="calcBtn" class="primary">Calculate flight</button>
-      <p class="hint err" id="calcError" role="alert"></p>
+      </div>
     </div>
   </div>
 
@@ -217,6 +240,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>
