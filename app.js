@@ -1,5 +1,33 @@
 'use strict';
 
+// Visible error reporter: on iPad/Safari there is no console, so paint any
+// startup/runtime error into a banner instead of failing silently blank.
+(function () {
+  function show(msg) {
+    try {
+      let el = document.getElementById('fatalErrorBar');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'fatalErrorBar';
+        el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#e0483f;color:#fff;font:12px -apple-system,sans-serif;padding:8px 34px 8px 10px;white-space:pre-wrap;word-break:break-word;';
+        const x = document.createElement('button');
+        x.textContent = '\u2715';
+        x.style.cssText = 'position:absolute;top:4px;right:6px;background:rgba(0,0,0,.25);border:none;color:#fff;border-radius:50%;width:22px;height:22px;';
+        x.onclick = function () { el.remove(); };
+        el.appendChild(x);
+        const span = document.createElement('span');
+        span.id = 'fatalErrorTxt';
+        el.appendChild(span);
+        (document.body || document.documentElement).appendChild(el);
+      }
+      document.getElementById('fatalErrorTxt').textContent = 'App error: ' + msg;
+    } catch (e) { /* last resort: nothing */ }
+  }
+  window.addEventListener('error', function (e) { show((e.message || 'unknown') + (e.filename ? ' @ ' + e.filename.split('/').pop() + ':' + e.lineno : '')); });
+  window.addEventListener('unhandledrejection', function (e) { show('Promise: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason))); });
+})();
+
+
 /* =========================================================================
    Weather Sonde Flight Planning
    ---------------------------------------------------------------------
@@ -373,46 +401,77 @@ function renderPresetSelect(selectedId) {
   if (w) $('balloonWeight').value = w;
 }
 
-function addPreset() {
-  const name = prompt('Preset name (e.g. "Latex 20 g"):');
-  if (!name) return;
-  const weight = parseFloat(prompt('Balloon weight in grams:', '20'));
-  if (!weight || weight <= 0) { alert('Please enter a valid weight in grams.'); return; }
+function presetEditorEl() { return $('presetEditor'); }
+
+function openPresetEditor(mode) {
+  const ed = presetEditorEl();
+  if (!ed) return;
+  const sel = $('balloonType');
   const presets = loadPresets();
-  const id = 'custom-' + Date.now();
-  presets.push({ id, name, weight });
-  savePresets(presets);
-  renderPresetSelect(id);
-  updateBurstHint();
+  const cur = presets.find(p => p.id === sel.value);
+  ed.dataset.mode = mode;
+  ed.hidden = false;
+  const nameI = $('presetName'), wI = $('presetWeightInput'), msg = $('presetMsg');
+  const saveB = $('presetSaveBtn');
+  msg.textContent = '';
+  if (mode === 'add') {
+    nameI.value = ''; wI.value = '20';
+    nameI.disabled = false; wI.disabled = false;
+    saveB.textContent = 'Save';
+    msg.textContent = 'New preset:';
+  } else if (mode === 'edit') {
+    if (sel.value === 'custom' || !cur) { msg.textContent = '"Custom…" is not a saved preset — edit the weight field directly.'; nameI.disabled = true; wI.disabled = true; saveB.textContent = 'OK'; ed.dataset.mode = 'noop'; return; }
+    nameI.value = cur.name; wI.value = cur.weight;
+    nameI.disabled = false; wI.disabled = false;
+    saveB.textContent = 'Save';
+    msg.textContent = 'Edit preset:';
+  } else if (mode === 'delete') {
+    if (sel.value === 'custom' || !cur) { msg.textContent = '"Custom…" can\u2019t be deleted.'; nameI.disabled = true; wI.disabled = true; saveB.textContent = 'OK'; ed.dataset.mode = 'noop'; return; }
+    if (presets.length <= 1) { msg.textContent = 'At least one saved preset must remain.'; nameI.disabled = true; wI.disabled = true; saveB.textContent = 'OK'; ed.dataset.mode = 'noop'; return; }
+    nameI.value = cur.name; wI.value = cur.weight;
+    nameI.disabled = true; wI.disabled = true;
+    saveB.textContent = 'Delete';
+    msg.textContent = `Delete preset "${cur.name}"?`;
+  }
 }
 
-function editPreset() {
-  const sel = $('balloonType');
-  if (sel.value === 'custom') { alert('The "Custom…" entry is not a saved preset — edit the weight field directly.'); return; }
-  const presets = loadPresets();
-  const idx = presets.findIndex(p => p.id === sel.value);
-  if (idx === -1) return;
-  const name = prompt('Preset name:', presets[idx].name);
-  if (!name) return;
-  const weight = parseFloat(prompt('Balloon weight in grams:', presets[idx].weight));
-  if (!weight || weight <= 0) { alert('Please enter a valid weight in grams.'); return; }
-  presets[idx] = { ...presets[idx], name, weight };
-  savePresets(presets);
-  renderPresetSelect(presets[idx].id);
-  updateBurstHint();
-}
+function closePresetEditor() { const ed = presetEditorEl(); if (ed) ed.hidden = true; }
 
-function deletePreset() {
+function commitPresetEditor() {
+  const ed = presetEditorEl();
+  if (!ed) return;
+  const mode = ed.dataset.mode;
   const sel = $('balloonType');
-  if (sel.value === 'custom') { alert('The "Custom…" entry can\'t be deleted.'); return; }
   let presets = loadPresets();
-  if (presets.length <= 1) { alert('At least one saved preset must remain.'); return; }
-  const p = presets.find(x => x.id === sel.value);
-  if (!p || !confirm(`Delete preset "${p.name}"?`)) return;
-  presets = presets.filter(x => x.id !== sel.value);
-  savePresets(presets);
-  renderPresetSelect(presets[0].id);
+  const msg = $('presetMsg');
+  if (mode === 'noop') { closePresetEditor(); return; }
+  if (mode === 'delete') {
+    presets = presets.filter(x => x.id !== sel.value);
+    savePresets(presets);
+    renderPresetSelect(presets[0].id);
+    updateBurstHint();
+    closePresetEditor();
+    return;
+  }
+  const name = $('presetName').value.trim();
+  const weight = parseFloat($('presetWeightInput').value);
+  if (!name) { msg.textContent = 'Please enter a preset name.'; return; }
+  if (!weight || weight <= 0) { msg.textContent = 'Please enter a valid weight in grams.'; return; }
+  if (mode === 'add') {
+    const id = 'custom-' + Date.now();
+    presets.push({ id, name, weight });
+    savePresets(presets);
+    renderPresetSelect(id);
+  } else if (mode === 'edit') {
+    const idx = presets.findIndex(p => p.id === sel.value);
+    if (idx !== -1) {
+      presets[idx] = { ...presets[idx], name, weight };
+      savePresets(presets);
+      renderPresetSelect(presets[idx].id);
+    }
+  }
   updateBurstHint();
+  closePresetEditor();
 }
 
 // =========================================================================
@@ -431,13 +490,43 @@ const state = {
   busy: false,
 };
 
-function markerStyle(kind) {
-  const colors = { launch: '#3fd06b', release: '#ffb454', land: '#e0483f', device: '#3fd0c9', target: '#b78cff' };
-  return {
-    radius: 10, color: '#ffffff', weight: 3,
-    fillColor: colors[kind], fillOpacity: 0.95,
-    className: 'marker-glow',
-  };
+// Pictorial map signatures (SVG divIcons). Anchors: balloon & parachute sit
+// with their payload point on the coordinate; explosion & crosshair centered.
+const SIG_SVGS = {
+  launch: {
+    svg: `<svg width="30" height="30" viewBox="0 0 30 30"><ellipse cx="15" cy="9" rx="7.5" ry="8.5" fill="#3fd06b" stroke="#ffffff" stroke-width="2"/><path d="M13.5 17.5 L16.5 17.5 L15.8 20 L14.2 20 Z" fill="#3fd06b" stroke="#fff" stroke-width="0.8"/><line x1="15" y1="20" x2="15" y2="25" stroke="#ffffff" stroke-width="1.6"/><rect x="12.6" y="25" width="4.8" height="4" rx="1" fill="#3fd06b" stroke="#ffffff" stroke-width="1.4"/></svg>`,
+    size: [30, 30], anchor: [15, 29],
+  },
+  release: { // small explosion
+    svg: `<svg width="32" height="32" viewBox="0 0 32 32"><path d="M16 1 L19.2 9.5 L27.5 5.5 L22.5 13 L31 16 L22.5 19 L27.5 26.5 L19.2 22.5 L16 31 L12.8 22.5 L4.5 26.5 L9.5 19 L1 16 L9.5 13 L4.5 5.5 L12.8 9.5 Z" fill="#ffb454" stroke="#0a0d10" stroke-width="1.4"/><path d="M16 8 L17.8 13.2 L23 11 L19.8 15.2 L25 16 L19.8 16.8 L23 21 L17.8 18.8 L16 24 L14.2 18.8 L9 21 L12.2 16.8 L7 16 L12.2 15.2 L9 11 L14.2 13.2 Z" fill="#e0483f"/><circle cx="16" cy="16" r="3" fill="#fff2c9"/></svg>`,
+    size: [32, 32], anchor: [16, 16],
+  },
+  land: { // parachute with sonde
+    svg: `<svg width="30" height="32" viewBox="0 0 30 32"><path d="M3.5 13 A12 10.5 0 0 1 26.5 13 Z" fill="#e0483f" stroke="#ffffff" stroke-width="1.8"/><path d="M3.5 13 Q9 10.5 15 13 Q21 10.5 26.5 13" fill="none" stroke="#ffffff" stroke-width="1"/><line x1="4.5" y1="13.5" x2="14" y2="26" stroke="#ffffff" stroke-width="1.3"/><line x1="25.5" y1="13.5" x2="16" y2="26" stroke="#ffffff" stroke-width="1.3"/><rect x="12.4" y="26" width="5.2" height="4.4" rx="1" fill="#e0483f" stroke="#ffffff" stroke-width="1.4"/></svg>`,
+    size: [30, 32], anchor: [15, 31],
+  },
+  target: { // desired landing crosshair
+    svg: `<svg width="30" height="30" viewBox="0 0 30 30"><circle cx="15" cy="15" r="9" fill="none" stroke="#b78cff" stroke-width="3"/><circle cx="15" cy="15" r="9" fill="rgba(183,140,255,0.15)"/><line x1="15" y1="1" x2="15" y2="8" stroke="#b78cff" stroke-width="3"/><line x1="15" y1="22" x2="15" y2="29" stroke="#b78cff" stroke-width="3"/><line x1="1" y1="15" x2="8" y2="15" stroke="#b78cff" stroke-width="3"/><line x1="22" y1="15" x2="29" y2="15" stroke="#b78cff" stroke-width="3"/><circle cx="15" cy="15" r="2.6" fill="#b78cff"/></svg>`,
+    size: [30, 30], anchor: [15, 15],
+  },
+  device: { // current device position
+    svg: `<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="8" fill="rgba(63,208,201,0.25)" stroke="#3fd0c9" stroke-width="2.5"/><circle cx="11" cy="11" r="3" fill="#3fd0c9"/></svg>`,
+    size: [22, 22], anchor: [11, 11],
+  },
+};
+
+function sigIcon(kind) {
+  const s = SIG_SVGS[kind];
+  return L.divIcon({
+    className: 'sig-icon',
+    html: s.svg,
+    iconSize: s.size,
+    iconAnchor: s.anchor,
+  });
+}
+
+function sigMarker(lat, lon, kind) {
+  return L.marker([lat, lon], { icon: sigIcon(kind), zIndexOffset: kind === 'launch' ? 300 : 200 });
 }
 
 function currentMode() {
@@ -445,8 +534,18 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
+const APP_VERSION = 'v1.11.0 · 2026-08-10';
+
 function initMap() {
-  state.map = L.map('map', { worldCopyJump: true, zoomControl: true }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 8);
+  state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
+
+  // Zoom + scale bar bottom-right (cockpit idiom)
+  L.control.zoom({ position: 'bottomright' }).addTo(state.map);
+  L.control.scale({ position: 'bottomright', imperial: false, maxWidth: 120 }).addTo(state.map);
+
+  // Version badge bottom-left (cockpit idiom)
+  const vc = $('versionChip');
+  if (vc) vc.textContent = `Sonde Flight Planning ${APP_VERSION}`;
 
   // Base layers + always-visible radio control, top-right (cockpit idiom)
   const baseLayers = {
@@ -478,7 +577,7 @@ function initMap() {
   });
   state.map.addControl(new BaseLayerRadioControl());
 
-  state.launchMarker = L.circleMarker([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], markerStyle('launch')).addTo(state.map);
+  state.launchMarker = sigMarker(parseFloat($('launchLat').value), parseFloat($('launchLon').value), 'launch').addTo(state.map);
 
   state.map.on('click', (e) => {
     if (state.busy) return;
@@ -496,6 +595,19 @@ function initMap() {
   setTimeout(fixMapSize, 50);
   setTimeout(fixMapSize, 300);
   if (window.ResizeObserver) new ResizeObserver(fixMapSize).observe(document.getElementById('mapwrap'));
+
+  // Start centered on the device position (~20 km view) when permitted;
+  // silently keep the default location otherwise.
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      const { latitude, longitude } = pos.coords;
+      if (state.deviceMarker) state.map.removeLayer(state.deviceMarker);
+      state.deviceMarker = sigMarker(latitude, longitude, 'device').addTo(state.map).bindPopup('Device position');
+      setLaunchPoint(latitude, longitude);
+      state.map.setView([latitude, longitude], 12);
+      setStatus('Centered on device position', `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+    }, () => { /* permission denied or unavailable: keep default */ }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 });
+  }
 }
 
 function setLaunchPoint(lat, lon) {
@@ -549,7 +661,7 @@ function useDeviceLocation() {
   navigator.geolocation.getCurrentPosition(pos => {
     const { latitude, longitude } = pos.coords;
     if (state.deviceMarker) state.map.removeLayer(state.deviceMarker);
-    state.deviceMarker = L.circleMarker([latitude, longitude], markerStyle('device')).addTo(state.map)
+    state.deviceMarker = sigMarker(latitude, longitude, 'device').addTo(state.map)
       .bindPopup('Device position').openPopup();
     setLaunchPoint(latitude, longitude);
     state.map.setView([latitude, longitude], 10);
@@ -578,14 +690,23 @@ async function searchPlace() {
 // Results modal
 // ---------------------------------------------------------------------
 function openResults() {
-  const m = $('resultsModal');
-  if (m) m.hidden = false;
+  const d = $('resultsDrawer');
+  const h = $('resultsHandle');
+  if (d) d.classList.remove('collapsed');
+  if (h) { h.classList.remove('closed'); h.textContent = '\u25C0'; }
   const fab = $('resultsOpenBtn');
   if (fab) fab.hidden = false;
 }
 function closeResults() {
-  const m = $('resultsModal');
-  if (m) m.hidden = true;
+  const d = $('resultsDrawer');
+  const h = $('resultsHandle');
+  if (d) d.classList.add('collapsed');
+  if (h) { h.classList.add('closed'); h.textContent = '\u25B6'; }
+}
+function toggleResults() {
+  const d = $('resultsDrawer');
+  if (!d) return;
+  if (d.classList.contains('collapsed')) openResults(); else closeResults();
 }
 
 function showError(e) {
@@ -672,6 +793,8 @@ async function runCalculation() {
   $('calcError').textContent = '';
   const drawer = $('menuDrawer');
   if (drawer) drawer.classList.add('collapsed');
+  const dh = $('drawerHandle');
+  if (dh) { dh.classList.add('closed'); dh.textContent = '◀'; }
   setStatus('Fetching weather…', 'wind + pressure levels');
   try {
     const lat = parseFloat($('launchLat').value);
@@ -726,15 +849,15 @@ function drawTrajectory(traj) {
   state.trajectoryLine = L.polyline(latlngs, { color: '#3fd0c9', weight: 4, opacity: 1, className: 'flightpath-glow' }).addTo(state.map);
 
   const releasePt = traj.path[traj.releaseIdx];
-  state.releaseMarker = L.circleMarker([releasePt.lat, releasePt.lon], markerStyle('release')).addTo(state.map)
+  state.releaseMarker = sigMarker(releasePt.lat, releasePt.lon, 'release').addTo(state.map)
     .bindPopup(`Burst / release<br>${Math.round(releasePt.alt)} m AMSL`);
 
   const land = traj.path[traj.path.length - 1];
-  state.landMarker = L.circleMarker([land.lat, land.lon], markerStyle('land')).addTo(state.map)
+  state.landMarker = sigMarker(land.lat, land.lon, 'land').addTo(state.map)
     .bindPopup(`Predicted landing<br>${land.lat.toFixed(4)}, ${land.lon.toFixed(4)}`);
 
   // Launch marker on top again for clarity
-  state.launchMarker.bringToFront();
+  if (state.launchMarker.setZIndexOffset) state.launchMarker.setZIndexOffset(400);
 
   state.map.fitBounds(state.trajectoryLine.getBounds(), { padding: [40, 40] });
 }
@@ -800,7 +923,7 @@ async function reverseCalcFromLanding(targetLat, targetLon) {
   try {
     // Mark the desired landing point (violet) immediately.
     if (state.targetMarker) state.map.removeLayer(state.targetMarker);
-    state.targetMarker = L.circleMarker([targetLat, targetLon], markerStyle('target')).addTo(state.map)
+    state.targetMarker = sigMarker(targetLat, targetLon, 'target').addTo(state.map)
       .bindPopup(`Desired landing<br>${targetLat.toFixed(4)}, ${targetLon.toFixed(4)}`).openPopup();
 
     setStatus('Back-solving launch site…', 'iterating against wind field');
@@ -942,9 +1065,11 @@ function wireUI() {
   });
   on('balloonWeight', 'input', updateBurstHint);
   on('burstDiameterOverride', 'input', updateBurstHint);
-  on('addPresetBtn', 'click', addPreset);
-  on('editPresetBtn', 'click', editPreset);
-  on('deletePresetBtn', 'click', deletePreset);
+  on('addPresetBtn', 'click', () => openPresetEditor('add'));
+  on('editPresetBtn', 'click', () => openPresetEditor('edit'));
+  on('deletePresetBtn', 'click', () => openPresetEditor('delete'));
+  on('presetSaveBtn', 'click', commitPresetEditor);
+  on('presetCancelBtn', 'click', closePresetEditor);
   on('gasType', 'change', e => {
     const l = e.target.selectedOptions[0].dataset.lift;
     if (l) $('gasLift').value = l;
@@ -969,42 +1094,106 @@ function wireUI() {
   on('copyLinkBtn', 'click', copyShareLink);
   on('exportImageBtn', 'click', exportImage);
 
-  // Results modal controls
+  // Results drawer controls (left)
   on('resultsCloseBtn', 'click', closeResults);
-  on('resultsOpenBtn', 'click', openResults);
-  on('resultsModal', 'click', e => { if (e.target === $('resultsModal')) closeResults(); });
+  on('resultsOpenBtn', 'click', toggleResults);
+  on('resultsHandle', 'click', toggleResults);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeResults(); });
 
-  // Hamburger settings drawer
+  // Settings drawer (right) with handle
   const toggleDrawer = (open) => {
     const d = $('menuDrawer');
+    const h = $('drawerHandle');
     if (!d) return;
     if (open === undefined) open = d.classList.contains('collapsed');
     d.classList.toggle('collapsed', !open);
+    if (h) {
+      h.classList.toggle('closed', !open);
+      h.textContent = open ? '▶' : '◀';
+    }
     setTimeout(() => { if (state.map) state.map.invalidateSize(); }, 280);
   };
   on('menuBtn', 'click', () => toggleDrawer());
   on('menuCloseBtn', 'click', () => toggleDrawer(false));
+  on('drawerHandle', 'click', () => toggleDrawer());
   // Open drawer on first load so the user sees the settings once.
   toggleDrawer(true);
 
   // Weather model chip + popover (cockpit idiom), synced to hidden select
+  // Full Open-Meteo model catalogue (forecast API `models=` strings).
+  // Regional models only cover their domain and shorter horizons; if a model
+  // doesn't cover the requested location/variables the app automatically
+  // falls back to best_match (see fetchWeather).
   const wxModels = [
-    { v: '', label: 'Best match (auto)' },
-    { v: 'gfs_seamless', label: 'GFS (NOAA)' },
-    { v: 'icon_seamless', label: 'ICON (DWD)' },
+    { group: 'Automatic' },
+    { v: '', label: 'Best match (auto blend)' },
+    { group: 'Global' },
     { v: 'ecmwf_ifs025', label: 'ECMWF IFS 0.25°' },
-    { v: 'gem_seamless', label: 'GEM (Canada)' },
-    { v: 'meteofrance_seamless', label: 'ARPEGE/AROME (MF)' },
-    { v: 'ukmo_seamless', label: 'UKMO' },
-    { v: 'jma_seamless', label: 'JMA' },
+    { v: 'ecmwf_aifs025', label: 'ECMWF AIFS 0.25° (AI)' },
+    { v: 'gfs_seamless', label: 'GFS Seamless (NOAA)' },
+    { v: 'gfs_global', label: 'GFS Global (NOAA)' },
+    { v: 'gfs_graphcast025', label: 'GFS GraphCast (AI)' },
+    { v: 'icon_seamless', label: 'ICON Seamless (DWD)' },
+    { v: 'icon_global', label: 'ICON Global (DWD)' },
+    { v: 'gem_seamless', label: 'GEM Seamless (Canada)' },
+    { v: 'gem_global', label: 'GEM Global (Canada)' },
+    { v: 'meteofrance_seamless', label: 'Météo-France Seamless' },
+    { v: 'meteofrance_arpege_world', label: 'ARPEGE World (MF)' },
+    { v: 'ukmo_seamless', label: 'UKMO Seamless' },
+    { v: 'ukmo_global_deterministic_10km', label: 'UKMO Global 10 km' },
+    { v: 'jma_seamless', label: 'JMA Seamless (Japan)' },
+    { v: 'jma_gsm', label: 'JMA GSM (Japan)' },
+    { v: 'kma_seamless', label: 'KMA Seamless (Korea)' },
+    { v: 'cma_grapes_global', label: 'CMA GRAPES (China)' },
+    { v: 'bom_access_global', label: 'BOM ACCESS-G (Australia)' },
+    { group: 'Europe regional' },
+    { v: 'icon_eu', label: 'ICON-EU 7 km (DWD)' },
+    { v: 'icon_d2', label: 'ICON-D2 2 km (DWD)' },
+    { v: 'meteofrance_arpege_europe', label: 'ARPEGE Europe (MF)' },
+    { v: 'meteofrance_arome_france', label: 'AROME France 1.3 km' },
+    { v: 'meteofrance_arome_france_hd', label: 'AROME France HD' },
+    { v: 'ukmo_uk_deterministic_2km', label: 'UKMO UKV 2 km' },
+    { v: 'knmi_seamless', label: 'KNMI Seamless (NL)' },
+    { v: 'knmi_harmonie_arome_europe', label: 'KNMI HARMONIE Europe' },
+    { v: 'dmi_seamless', label: 'DMI Seamless (DK)' },
+    { v: 'dmi_harmonie_arome_europe', label: 'DMI HARMONIE Europe' },
+    { v: 'metno_seamless', label: 'MET Norway Seamless' },
+    { v: 'metno_nordic', label: 'MET Norway Nordic 1 km' },
+    { v: 'italia_meteo_arpae_icon_2i', label: 'ICON-2I Italy (ARPAE)' },
+    { group: 'Regional (other)' },
+    { v: 'gfs_hrrr', label: 'HRRR 3 km (USA)' },
+    { v: 'ncep_nbm_conus', label: 'NBM CONUS (USA)' },
+    { v: 'gem_regional', label: 'GEM Regional (Canada)' },
+    { v: 'gem_hrdps_continental', label: 'GEM HRDPS 2.5 km (Canada)' },
+    { v: 'jma_msm', label: 'JMA MSM 5 km (Japan)' },
   ];
+  function syncWxSelect() {
+    const sel = $('weatherModel');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '';
+    wxModels.forEach(m => {
+      if (m.group) return;
+      const o = document.createElement('option');
+      o.value = m.v; o.textContent = m.label;
+      sel.appendChild(o);
+    });
+    sel.value = wxModels.some(m => m.v === cur) ? cur : '';
+  }
+
   function renderWxPopover() {
     const pop = $('wxModelPopover');
     if (!pop) return;
     const cur = $('weatherModel').value;
     pop.innerHTML = '';
     wxModels.forEach(m => {
+      if (m.group) {
+        const h = document.createElement('div');
+        h.className = 'wx-group';
+        h.textContent = m.group;
+        pop.appendChild(h);
+        return;
+      }
       const b = document.createElement('button');
       b.type = 'button';
       b.textContent = m.label;
@@ -1020,6 +1209,7 @@ function wireUI() {
       pop.appendChild(b);
     });
   }
+  syncWxSelect();
   on("wxModelChip", "click", (e) => {
     const pop = $('wxModelPopover');
     if (!pop) return;

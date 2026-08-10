@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='24' r='18' fill='%233fd0c9'/%3E%3Cpath d='M26 40 L32 52 L38 40 Z' fill='%23ffb454'/%3E%3Crect x='29' y='52' width='6' height='6' rx='1' fill='%23e6edf3'/%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%230f8f86'/%3E%3Cpath d='M3 13.5 Q6 8 7.5 5' fill='none' stroke='%23ffffff' stroke-width='1.7' stroke-linecap='round'/%3E%3Ccircle cx='9' cy='4.5' r='2.4' fill='%23ffb454'/%3E%3Ccircle cx='12' cy='10' r='1.8' fill='%23ffb454'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="mask-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%230f8f86'/%3E%3Cpath d='M12 88 Q26 50 44 32' fill='none' stroke='%23ffffff' stroke-width='6' stroke-linecap='round'/%3E%3Cpath d='M58 40 Q72 58 84 86' fill='none' stroke='%23ffffff' stroke-width='4' stroke-linecap='round' stroke-dasharray='1 9'/%3E%3Ccircle cx='12' cy='88' r='6' fill='%23ffffff'/%3E%3Cpath d='M50 12 L53 22 L62 17 L58 27 L68 30 L58 33 L62 43 L53 38 L50 48 L47 38 L38 43 L42 33 L32 30 L42 27 L38 17 L47 22 Z' fill='%23ffb454'/%3E%3Cpath d='M66 58 A11 9 0 0 1 88 58 Z' fill='%23ffb454'/%3E%3Cline x1='67' y1='59' x2='75' y2='72' stroke='%23ffb454' stroke-width='2'/%3E%3Cline x1='87' y1='59' x2='79' y2='72' stroke='%23ffb454' stroke-width='2'/%3E%3Crect x='73' y='72' width='8' height='7' rx='1.5' fill='%23ffffff'/%3E%3C/svg%3E" color="#0f8f86">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -10,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
 <div id="app">
@@ -27,7 +29,6 @@
     </div>
     <div class="sep"></div>
 
-    <!-- Weather model chip (cockpit idiom): tap to choose model -->
     <div class="wx-chip" id="wxModelChip" title="Tap to choose a weather model">
       <div class="wx-chip-line">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
@@ -49,10 +50,10 @@
     <div class="sep"></div>
 
     <div class="legend-chips">
-      <span><i class="dot launch"></i>Launch</span>
-      <span><i class="dot release"></i>Burst</span>
-      <span><i class="dot land"></i>Landing</span>
-      <span><i class="dot target"></i>Target</span>
+      <span title="Launch"><svg width="14" height="14" viewBox="0 0 30 30"><ellipse cx="15" cy="10" rx="7" ry="8" fill="#3fd06b" stroke="#fff" stroke-width="1.5"/><line x1="15" y1="18" x2="15" y2="24" stroke="#fff" stroke-width="1.5"/><rect x="12.8" y="24" width="4.4" height="3.6" rx="0.8" fill="#3fd06b" stroke="#fff" stroke-width="1"/></svg>Launch</span>
+      <span title="Burst / release"><svg width="14" height="14" viewBox="0 0 30 30"><path d="M15 2 L18 10 L26 6 L21 13 L29 15 L21 17 L26 24 L18 20 L15 28 L12 20 L4 24 L9 17 L1 15 L9 13 L4 6 L12 10 Z" fill="#ffb454" stroke="#0a0d10" stroke-width="1"/><circle cx="15" cy="15" r="3" fill="#e0483f"/></svg>Burst</span>
+      <span title="Landing"><svg width="14" height="14" viewBox="0 0 30 30"><path d="M4 13 A11 9 0 0 1 26 13 L15 13 Z" fill="#e0483f" stroke="#fff" stroke-width="1.5"/><line x1="5" y1="13" x2="15" y2="25" stroke="#fff" stroke-width="1.2"/><line x1="25" y1="13" x2="15" y2="25" stroke="#fff" stroke-width="1.2"/><circle cx="15" cy="26" r="2.4" fill="#e0483f" stroke="#fff" stroke-width="1"/></svg>Landing</span>
+      <span title="Desired landing"><svg width="14" height="14" viewBox="0 0 30 30"><circle cx="15" cy="15" r="9" fill="none" stroke="#b78cff" stroke-width="2.5"/><line x1="15" y1="2" x2="15" y2="9" stroke="#b78cff" stroke-width="2.5"/><line x1="15" y1="21" x2="15" y2="28" stroke="#b78cff" stroke-width="2.5"/><line x1="2" y1="15" x2="9" y2="15" stroke="#b78cff" stroke-width="2.5"/><line x1="21" y1="15" x2="28" y2="15" stroke="#b78cff" stroke-width="2.5"/><circle cx="15" cy="15" r="2.5" fill="#b78cff"/></svg>Target</span>
     </div>
 
     <div class="spacer"></div>
@@ -64,10 +65,51 @@
 
   <!-- ================= MAIN ================= -->
   <div id="main">
-    <div id="mapwrap"><div id="map"></div></div>
+    <div id="mapwrap">
+      <div id="map"></div>
+      <div id="versionChip" class="version-badge"></div>
+    </div>
 
-    <!-- ============ SETTINGS DRAWER (hamburger, left) ============ -->
-    <div id="menuDrawer" class="collapsed">
+    <div id="resultsHandle" class="closed" title="Show / hide results">▶</div>
+
+    <!-- ============ RESULTS DRAWER (left) ============ -->
+    <div id="resultsDrawer" class="collapsed">
+      <div class="drawer-head">
+        <span>06 · Results</span>
+        <button type="button" id="resultsCloseBtn" class="overlay-close" title="Close results" aria-label="Close results">✕</button>
+      </div>
+      <div class="results-scroll" id="resultsCard">
+        <div class="export-actions">
+          <button type="button" id="exportJsonBtn" class="ghost">⭳ JSON</button>
+          <button type="button" id="printBtn" class="ghost">🖶 Print</button>
+          <button type="button" id="copyLinkBtn" class="ghost">🔗 Link</button>
+          <button type="button" id="exportImageBtn" class="ghost">🖼 Image</button>
+        </div>
+        <div class="datagrid">
+          <div class="datacell"><label>Surface pressure</label><span class="val" id="resPressure">—</span></div>
+          <div class="datacell"><label>Gross lift</label><span class="val" id="resGrossLift">—</span></div>
+          <div class="datacell"><label>Net lift</label><span class="val" id="resNetLift">—</span></div>
+          <div class="datacell"><label>Gas volume</label><span class="val" id="resGasVolume">—</span></div>
+          <div class="datacell"><label>Inflated Ø</label><span class="val" id="resDiameter">—</span></div>
+          <div class="datacell"><label>Burst altitude</label><span class="val" id="resBurstAlt">—</span></div>
+          <div class="datacell"><label>Ascent time</label><span class="val" id="resAscentTime">—</span></div>
+          <div class="datacell"><label>Total flight time</label><span class="val" id="resFlightTime">—</span></div>
+          <div class="datacell"><label>Landing distance</label><span class="val" id="resDistance">—</span></div>
+          <div class="datacell"><label>Tropopause (model)</label><span class="val" id="resTropopause">—</span></div>
+          <div class="datacell wide"><label>Weather data used</label><span class="val small" id="resWeatherSource">—</span></div>
+        </div>
+        <div class="profile-box">
+          <label>Ascent / descent profile</label>
+          <svg id="profileSvg" viewBox="0 0 420 280" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+        <p class="hint disclaimer">Approximations for mission planning — cross-check against manufacturer data and NOTAM / airspace rules before launch. Weather: Open-Meteo.</p>
+      </div>
+    </div>
+
+    <div id="drawerHandle" title="Show / hide settings">▶</div>
+
+    <!-- ============ SETTINGS DRAWER (right) ============ -->
+    <div id="menuDrawer">
       <div class="drawer-head">
         <span>Flight settings</span>
         <button type="button" id="menuCloseBtn" class="overlay-close" title="Close menu" aria-label="Close settings menu">✕</button>
@@ -77,49 +119,26 @@
 
         <div class="card">
           <h3>01 · Payload <span class="chev">▾</span></h3>
-          <div class="cardbody">
-            <div class="frow"><label for="sondeType">Sonde type</label>
+          <div class="cardbody cellgrid">
+            <div class="fcell wide"><label for="sondeType">Sonde type</label>
               <select id="sondeType">
                 <option value="sparv-s2" data-weight="9" selected>SparvEmbedded S2 (9 g)</option>
                 <option value="custom" data-weight="9">Custom…</option>
               </select>
             </div>
-            <div class="frow"><label for="sondeWeight">Sonde weight (g)</label>
+            <div class="fcell"><label for="sondeWeight">Sonde (g)</label>
               <input type="number" id="sondeWeight" value="9" min="1" step="0.5">
             </div>
-            <div class="frow"><label for="riggingWeight">Rigging etc. (g)</label>
+            <div class="fcell"><label for="riggingWeight">Rigging (g)</label>
               <input type="number" id="riggingWeight" value="5" min="0" step="0.5">
             </div>
           </div>
         </div>
 
         <div class="card">
-          <h3>02 · Balloon <span class="chev">▾</span></h3>
-          <div class="cardbody">
-            <div class="frow"><label for="balloonType">Balloon type</label>
-              <select id="balloonType"></select>
-            </div>
-            <div class="frow"><label>Presets</label>
-              <div class="btn-row">
-                <button type="button" id="addPresetBtn" class="ghost">+ Add</button>
-                <button type="button" id="editPresetBtn" class="ghost">Edit</button>
-                <button type="button" id="deletePresetBtn" class="ghost">Del</button>
-              </div>
-            </div>
-            <div class="frow"><label for="balloonWeight">Balloon weight (g)</label>
-              <input type="number" id="balloonWeight" value="9" min="1" step="1">
-            </div>
-            <div class="frow"><label for="burstDiameterOverride">Burst Ø override (m)</label>
-              <input type="number" id="burstDiameterOverride" placeholder="auto" min="0.1" step="0.01">
-            </div>
-            <p class="hint" id="burstDiameterHint"></p>
-          </div>
-        </div>
-
-        <div class="card">
           <h3>03 · Fill gas <span class="chev">▾</span></h3>
-          <div class="cardbody">
-            <div class="frow"><label for="gasType">Fill gas</label>
+          <div class="cardbody cellgrid">
+            <div class="fcell"><label for="gasType">Fill gas</label>
               <select id="gasType">
                 <option value="ballongas-linde" data-lift="0.90" selected>Ballongas (Linde)</option>
                 <option value="helium" data-lift="1.045">Helium (pure)</option>
@@ -127,51 +146,83 @@
                 <option value="custom" data-lift="0.90">Custom…</option>
               </select>
             </div>
-            <div class="frow"><label for="gasLift">Lift (kg/m³ @SL)</label>
+            <div class="fcell"><label for="gasLift">Lift (kg/m³ @SL)</label>
               <input type="number" id="gasLift" value="0.90" min="0.1" step="0.01">
             </div>
           </div>
         </div>
 
-        <div class="card">
+        <div class="card wide2">
+          <h3>02 · Balloon <span class="chev">▾</span></h3>
+          <div class="cardbody cellgrid cols4">
+            <div class="fcell span2"><label for="balloonType">Balloon type</label>
+              <select id="balloonType"></select>
+            </div>
+            <div class="fcell span2"><label>Presets</label>
+              <div class="btn-row">
+                <button type="button" id="addPresetBtn" class="ghost">+ Add</button>
+                <button type="button" id="editPresetBtn" class="ghost">Edit</button>
+                <button type="button" id="deletePresetBtn" class="ghost">Del</button>
+              </div>
+            </div>
+            <div class="fcell span2 preset-editor" id="presetEditor" hidden>
+              <label id="presetMsg">Preset</label>
+              <div class="btn-row">
+                <input type="text" id="presetName" placeholder="Name (e.g. Latex 20 g)">
+                <input type="number" id="presetWeightInput" placeholder="g" min="1" step="0.5" style="max-width:64px;">
+                <button type="button" id="presetSaveBtn" class="ghost">Save</button>
+                <button type="button" id="presetCancelBtn" class="ghost">✕</button>
+              </div>
+            </div>
+            <div class="fcell"><label for="balloonWeight">Balloon (g)</label>
+              <input type="number" id="balloonWeight" value="9" min="1" step="1">
+            </div>
+            <div class="fcell"><label for="burstDiameterOverride">Burst Ø ovr. (m)</label>
+              <input type="number" id="burstDiameterOverride" placeholder="auto" min="0.1" step="0.01">
+            </div>
+            <div class="fcell span2 hintcell"><label>Estimate</label><span class="hint" id="burstDiameterHint"></span></div>
+          </div>
+        </div>
+
+        <div class="card wide2">
           <h3>04 · Launch site &amp; time <span class="chev">▾</span></h3>
-          <div class="cardbody">
-            <div class="frow"><label for="placeSearch">Location</label>
+          <div class="cardbody cellgrid cols4">
+            <div class="fcell span2"><label for="placeSearch">Location search</label>
               <div class="btn-row">
                 <input type="text" id="placeSearch" placeholder="Place name…">
                 <button type="button" id="searchBtn" class="ghost">Find</button>
                 <button type="button" id="geolocateBtn" class="ghost" title="Use current device position">⦿</button>
               </div>
             </div>
-            <div class="status-box" id="searchStatus"></div>
-            <div class="frow"><label for="launchLat">Lat / Lon</label>
-              <div class="pair">
-                <input type="number" id="launchLat" value="47.3769" step="0.0001">
-                <input type="number" id="launchLon" value="8.5417" step="0.0001">
-              </div>
+            <div class="fcell"><label for="launchLat">Latitude</label>
+              <input type="number" id="launchLat" value="47.3769" step="0.0001">
             </div>
-            <div class="frow"><label for="launchDate">Date / time UTC</label>
-              <div class="pair">
-                <input type="date" id="launchDate">
-                <input type="time" id="launchTime" step="60">
-              </div>
+            <div class="fcell"><label for="launchLon">Longitude</label>
+              <input type="number" id="launchLon" value="8.5417" step="0.0001">
+            </div>
+            <div class="fcell span2 statuscell"><div class="status-box" id="searchStatus"></div></div>
+            <div class="fcell"><label for="launchDate">Date (UTC)</label>
+              <input type="date" id="launchDate">
+            </div>
+            <div class="fcell"><label for="launchTime">Time (UTC)</label>
+              <input type="time" id="launchTime" step="60">
             </div>
           </div>
         </div>
 
-        <div class="card">
+        <div class="card wide2">
           <h3>05 · Flight profile <span class="chev">▾</span></h3>
-          <div class="cardbody">
-            <div class="frow"><label for="targetMode">Ascent target</label>
+          <div class="cardbody cellgrid cols4">
+            <div class="fcell"><label for="targetMode">Ascent target</label>
               <select id="targetMode">
-                <option value="altitude" selected>Fixed altitude (m AMSL)</option>
-                <option value="burst">Ascend to burst height</option>
+                <option value="altitude" selected>Fixed altitude</option>
+                <option value="burst">To burst height</option>
               </select>
             </div>
-            <div class="frow" id="targetAltitudeWrap"><label for="targetAltitude">Release alt. (m AMSL)</label>
+            <div class="fcell" id="targetAltitudeWrap"><label for="targetAltitude">Release (m AMSL)</label>
               <input type="number" id="targetAltitude" value="5500" min="100" step="100">
             </div>
-            <div class="frow"><label for="ascentRate">Ascent rate</label>
+            <div class="fcell"><label for="ascentRate">Ascent rate</label>
               <select id="ascentRate">
                 <option value="1.0">1.0 m/s</option>
                 <option value="1.5">1.5 m/s</option>
@@ -182,7 +233,7 @@
                 <option value="4.0">4.0 m/s</option>
               </select>
             </div>
-            <div class="frow"><label for="descentRate">Descent rate (m/s @SL)</label>
+            <div class="fcell"><label for="descentRate">Descent (m/s @SL)</label>
               <input type="number" id="descentRate" value="5" min="1" max="15" step="0.5">
             </div>
           </div>
@@ -199,47 +250,10 @@
 
 </div>
 
-<!-- ================= RESULTS MODAL ================= -->
-<div class="overlay" id="resultsModal" hidden>
-  <section class="overlay-box" id="resultsCard" role="dialog" aria-modal="true" aria-label="Calculation results">
-    <button type="button" id="resultsCloseBtn" class="overlay-close" title="Close results" aria-label="Close results">✕</button>
-    <div class="results-header">
-      <h2>06 · Results</h2>
-      <div class="export-actions">
-        <button type="button" id="exportJsonBtn" class="ghost">⭳ JSON</button>
-        <button type="button" id="printBtn" class="ghost">🖶 Print</button>
-        <button type="button" id="copyLinkBtn" class="ghost">🔗 Link</button>
-        <button type="button" id="exportImageBtn" class="ghost">🖼 Image</button>
-      </div>
-    </div>
 
-    <div class="results-body">
-      <div class="datagrid">
-        <div class="datacell"><label>Surface pressure</label><span class="val" id="resPressure">—</span></div>
-        <div class="datacell"><label>Gross lift</label><span class="val" id="resGrossLift">—</span></div>
-        <div class="datacell"><label>Net lift</label><span class="val" id="resNetLift">—</span></div>
-        <div class="datacell"><label>Gas volume</label><span class="val" id="resGasVolume">—</span></div>
-        <div class="datacell"><label>Inflated Ø</label><span class="val" id="resDiameter">—</span></div>
-        <div class="datacell"><label>Burst altitude</label><span class="val" id="resBurstAlt">—</span></div>
-        <div class="datacell"><label>Ascent time</label><span class="val" id="resAscentTime">—</span></div>
-        <div class="datacell"><label>Total flight time</label><span class="val" id="resFlightTime">—</span></div>
-        <div class="datacell"><label>Landing distance</label><span class="val" id="resDistance">—</span></div>
-        <div class="datacell"><label>Tropopause (model)</label><span class="val" id="resTropopause">—</span></div>
-        <div class="datacell wide"><label>Weather data used</label><span class="val small" id="resWeatherSource">—</span></div>
-      </div>
-
-      <div class="profile-box">
-        <label>Ascent / descent profile</label>
-        <svg id="profileSvg" viewBox="0 0 420 280" preserveAspectRatio="xMidYMid meet"></svg>
-      </div>
-    </div>
-
-    <p class="hint disclaimer">Approximations for mission planning — cross-check against manufacturer data and NOTAM / airspace rules before launch. Weather: Open-Meteo.</p>
-  </section>
-</div>
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>
