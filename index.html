@@ -10,9 +10,48 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Sonde Planner">
 <meta name="mobile-web-app-capable" content="yes">
+<script>
+(function(){
+  function show(msg){
+    try{
+      var el=document.getElementById('fatalErrorBar');
+      if(!el){
+        el=document.createElement('div');
+        el.id='fatalErrorBar';
+        el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#e0483f;color:#fff;font:12px -apple-system,sans-serif;padding:8px 34px 8px 10px;white-space:pre-wrap;word-break:break-word;';
+        var x=document.createElement('button');
+        x.textContent='\u2715';
+        x.style.cssText='position:absolute;top:4px;right:6px;background:rgba(0,0,0,.25);border:none;color:#fff;border-radius:50%;width:22px;height:22px;';
+        x.onclick=function(){el.remove();};
+        el.appendChild(x);
+        var sp=document.createElement('span');sp.id='fatalErrorTxt';el.appendChild(sp);
+        (document.body||document.documentElement).appendChild(el);
+      }
+      document.getElementById('fatalErrorTxt').textContent='App error: '+msg;
+    }catch(e){}
+  }
+  window.__appError=show;
+  window.addEventListener('error',function(e){
+    if(e.target && (e.target.tagName==='SCRIPT'||e.target.tagName==='LINK')){
+      show('Failed to load resource: '+(e.target.src||e.target.href||'?')+' \u2014 check network / content blocker');
+    }else{
+      show((e.message||'unknown')+(e.filename?' @ '+e.filename.split('/').pop()+':'+e.lineno:''));
+    }
+  },true);
+  window.addEventListener('unhandledrejection',function(e){
+    show('Promise: '+(e.reason&&e.reason.message?e.reason.message:String(e.reason)));
+  });
+  if(location.search.indexOf('debug')!==-1){
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/eruda/3.0.1/eruda.min.js';
+    s.onload=function(){try{window.eruda.init();}catch(e){}};
+    document.head.appendChild(s);
+  }
+})();
+</script>
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=14">
 </head>
 <body>
 <div id="app">
@@ -53,7 +92,6 @@
       <span title="Launch"><svg width="14" height="14" viewBox="0 0 30 30"><ellipse cx="15" cy="10" rx="7" ry="8" fill="#3fd06b" stroke="#fff" stroke-width="1.5"/><line x1="15" y1="18" x2="15" y2="24" stroke="#fff" stroke-width="1.5"/><rect x="12.8" y="24" width="4.4" height="3.6" rx="0.8" fill="#3fd06b" stroke="#fff" stroke-width="1"/></svg>Launch</span>
       <span title="Burst / release"><svg width="14" height="14" viewBox="0 0 30 30"><path d="M15 2 L18 10 L26 6 L21 13 L29 15 L21 17 L26 24 L18 20 L15 28 L12 20 L4 24 L9 17 L1 15 L9 13 L4 6 L12 10 Z" fill="#ffb454" stroke="#0a0d10" stroke-width="1"/><circle cx="15" cy="15" r="3" fill="#e0483f"/></svg>Burst</span>
       <span title="Landing"><svg width="14" height="14" viewBox="0 0 30 30"><path d="M4 13 A11 9 0 0 1 26 13 L15 13 Z" fill="#e0483f" stroke="#fff" stroke-width="1.5"/><line x1="5" y1="13" x2="15" y2="25" stroke="#fff" stroke-width="1.2"/><line x1="25" y1="13" x2="15" y2="25" stroke="#fff" stroke-width="1.2"/><circle cx="15" cy="26" r="2.4" fill="#e0483f" stroke="#fff" stroke-width="1"/></svg>Landing</span>
-      <span title="Desired landing"><svg width="14" height="14" viewBox="0 0 30 30"><circle cx="15" cy="15" r="9" fill="none" stroke="#b78cff" stroke-width="2.5"/><line x1="15" y1="2" x2="15" y2="9" stroke="#b78cff" stroke-width="2.5"/><line x1="15" y1="21" x2="15" y2="28" stroke="#b78cff" stroke-width="2.5"/><line x1="2" y1="15" x2="9" y2="15" stroke="#b78cff" stroke-width="2.5"/><line x1="21" y1="15" x2="28" y2="15" stroke="#b78cff" stroke-width="2.5"/><circle cx="15" cy="15" r="2.5" fill="#b78cff"/></svg>Target</span>
     </div>
 
     <div class="spacer"></div>
@@ -254,6 +292,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=12"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>

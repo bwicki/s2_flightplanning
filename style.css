@@ -203,3 +203,24 @@ button.primary:active{transform:scale(0.99);}
 #resultsHandle{right:var(--results-w);border-radius:9px 0 0 9px;background:#c97a12;color:#fff;border:1px solid rgba(255,255,255,0.25);border-right:none;transform:none;}
 #resultsHandle .hlbl{writing-mode:vertical-rl;}
 #resultsHandle.closed{right:0;}
+
+/* ---- map layer radio: force stacked, left-aligned entries ---- */
+.base-layer-radio input[type="radio"]{width:auto;flex:0 0 auto;}
+.base-layer-radio label{width:100%;justify-content:flex-start;text-align:left;}
+
+/* ---- shift right-side map controls left when results drawer is open ---- */
+#mapwrap{--mro:0px;}
+#mapwrap.results-open{--mro:var(--results-w);}
+#mapwrap .leaflet-right{right:var(--mro);transition:right .25s ease;}
+
+/* ---- cockpit-style scale bar (bottom right, left of zoom) ---- */
+.map-scale-bar{position:absolute;right:calc(76px + var(--mro));bottom:12px;background:rgba(255,255,255,0.85);border-radius:4px;padding:3px 6px 4px;pointer-events:none;font-size:10px;color:#1a1a1a;display:flex;flex-direction:column;align-items:stretch;gap:2px;box-shadow:0 1px 4px rgba(0,0,0,.25);z-index:900;transition:right .25s ease;font-family:sans-serif;}
+.map-scale-ruler-wrap{position:relative;padding-bottom:11px;}
+.map-scale-ruler{position:relative;height:7px;display:flex;border:1px solid #1a1a1a;box-sizing:border-box;}
+.map-scale-tick-label{position:absolute;top:9px;font-size:8.5px;color:#1a1a1a;line-height:1;}
+.map-scale-ruler > div{flex:1;border-right:1px solid #1a1a1a;}
+.map-scale-ruler > div:last-child{border-right:none;}
+.map-scale-ruler > div:nth-child(odd){background:#1a1a1a;}
+.map-scale-ruler > div:nth-child(even){background:#fff;}
+.map-scale-text{font-weight:700;white-space:nowrap;text-align:center;}
+.map-scale-ratio{font-weight:400;}

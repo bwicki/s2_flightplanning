@@ -1,32 +1,5 @@
 'use strict';
 
-// Visible error reporter: on iPad/Safari there is no console, so paint any
-// startup/runtime error into a banner instead of failing silently blank.
-(function () {
-  function show(msg) {
-    try {
-      let el = document.getElementById('fatalErrorBar');
-      if (!el) {
-        el = document.createElement('div');
-        el.id = 'fatalErrorBar';
-        el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#e0483f;color:#fff;font:12px -apple-system,sans-serif;padding:8px 34px 8px 10px;white-space:pre-wrap;word-break:break-word;';
-        const x = document.createElement('button');
-        x.textContent = '\u2715';
-        x.style.cssText = 'position:absolute;top:4px;right:6px;background:rgba(0,0,0,.25);border:none;color:#fff;border-radius:50%;width:22px;height:22px;';
-        x.onclick = function () { el.remove(); };
-        el.appendChild(x);
-        const span = document.createElement('span');
-        span.id = 'fatalErrorTxt';
-        el.appendChild(span);
-        (document.body || document.documentElement).appendChild(el);
-      }
-      document.getElementById('fatalErrorTxt').textContent = 'App error: ' + msg;
-    } catch (e) { /* last resort: nothing */ }
-  }
-  window.addEventListener('error', function (e) { show((e.message || 'unknown') + (e.filename ? ' @ ' + e.filename.split('/').pop() + ':' + e.lineno : '')); });
-  window.addEventListener('unhandledrejection', function (e) { show('Promise: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason))); });
-})();
-
 
 /* =========================================================================
    Weather Sonde Flight Planning
@@ -534,14 +507,42 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.12.0 · 2026-08-10';
+const APP_VERSION = 'v1.14.0 · 2026-08-10';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
 
   // Zoom + scale bar bottom-right (cockpit idiom)
   L.control.zoom({ position: 'bottomright' }).addTo(state.map);
-  L.control.scale({ position: 'bottomright', imperial: false, maxWidth: 120 }).addTo(state.map);
+  // Cockpit-style scale bar (custom, updates on zoom/pan)
+  (function () {
+    const bar = document.createElement('div');
+    bar.className = 'map-scale-bar';
+    bar.innerHTML = '<div class="map-scale-ruler-wrap"><div class="map-scale-ruler"><div></div><div></div><div></div><div></div></div><span class="map-scale-tick-label" style="left:0;">0</span><span class="map-scale-tick-label" id="scaleMid" style="left:50%;transform:translateX(-50%);"></span><span class="map-scale-tick-label" id="scaleEnd" style="right:0;"></span></div><span class="map-scale-text"><span id="scaleKm"></span> · <span class="map-scale-ratio" id="scaleRatio"></span></span>';
+    document.getElementById('mapwrap').appendChild(bar);
+    const fmt = (m) => m >= 1000 ? (m / 1000 >= 10 ? Math.round(m / 1000) + ' km' : (m / 1000).toFixed(1).replace(/\.0$/, '') + ' km') : Math.round(m) + ' m';
+    function updateScale() {
+      const map = state.map;
+      const c = map.getSize().y / 2;
+      const p1 = map.containerPointToLatLng([0, c]);
+      const p2 = map.containerPointToLatLng([100, c]);
+      const mPer100px = map.distance(p1, p2);
+      const nice = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000];
+      let target = mPer100px * 1.2;
+      let dist = nice[nice.length - 1];
+      for (const n of nice) { if (n >= target) { dist = n; break; } }
+      const px = dist / mPer100px * 100;
+      bar.querySelector('.map-scale-ruler').style.width = px + 'px';
+      document.getElementById('scaleMid').textContent = fmt(dist / 2);
+      document.getElementById('scaleEnd').textContent = fmt(dist);
+      document.getElementById('scaleKm').textContent = fmt(dist);
+      const mPerPx = mPer100px / 100;
+      const denom = Math.round(mPerPx * 96 / 0.0254);
+      document.getElementById('scaleRatio').textContent = '\u2248 1:' + denom.toLocaleString('de-CH');
+    }
+    state.map.on('zoomend moveend resize', updateScale);
+    setTimeout(updateScale, 200);
+  })();
 
   // Version badge bottom-left (cockpit idiom)
   const vc = $('versionChip');
@@ -578,6 +579,7 @@ function initMap() {
   state.map.addControl(new BaseLayerRadioControl());
 
   state.launchMarker = sigMarker(parseFloat($('launchLat').value), parseFloat($('launchLon').value), 'launch').addTo(state.map);
+  attachPointZoom(state.launchMarker);
 
   state.map.on('click', (e) => {
     if (state.busy) return;
@@ -695,6 +697,8 @@ function openResults() {
   const h = $('resultsHandle');
   if (d) d.classList.remove('collapsed');
   if (h) h.classList.remove('closed');
+  const mw = $('mapwrap');
+  if (mw) mw.classList.add('results-open');
   const fab = $('resultsOpenBtn');
   if (fab) fab.hidden = false;
 }
@@ -703,6 +707,8 @@ function closeResults() {
   const h = $('resultsHandle');
   if (d) d.classList.add('collapsed');
   if (h) h.classList.add('closed');
+  const mw = $('mapwrap');
+  if (mw) mw.classList.remove('results-open');
 }
 function toggleResults() {
   const d = $('resultsDrawer');
@@ -806,6 +812,7 @@ async function runCalculation() {
     drawTrajectory(r.traj);
     drawProfile(r.traj);
     openResults();
+    setTimeout(fitFlightPath, 320);
     const wxSub = $('wxModelSub');
     if (wxSub) wxSub.textContent = `wx ${r.weather.matchedTime} UTC`;
     setStatus(r.note ? 'Note — see form' : 'Calculation complete', `wx: ${r.weather.matchedTime} UTC`);
@@ -837,6 +844,28 @@ function renderResults(r) {
   if (r.note) $('calcError').textContent = r.note;
 }
 
+// Zoom fully onto a key point when its marker is clicked
+function attachPointZoom(marker) {
+  marker.on('click', () => {
+    state.map.flyTo(marker.getLatLng(), Math.max(state.map.getZoom(), 15), { duration: 0.6 });
+  });
+}
+
+// Fit the whole flight path in view, keeping it clear of the open drawers
+function fitFlightPath() {
+  if (!state.trajectoryLine) return;
+  const rd = $('resultsDrawer');
+  const resultsOpen = rd && !rd.classList.contains('collapsed');
+  const md = $('menuDrawer');
+  const paramsOpen = md && !md.classList.contains('collapsed');
+  const rightPad = (resultsOpen ? Math.min(440, window.innerWidth * 0.92) : 0) + 50;
+  const leftPad = (paramsOpen ? Math.min(620, window.innerWidth * 0.94) : 0) + 50;
+  state.map.fitBounds(state.trajectoryLine.getBounds(), {
+    paddingTopLeft: [leftPad, 60],
+    paddingBottomRight: [rightPad, 70],
+  });
+}
+
 function drawTrajectory(traj) {
   if (state.trajectoryCasing) state.map.removeLayer(state.trajectoryCasing);
   if (state.trajectoryLine) state.map.removeLayer(state.trajectoryLine);
@@ -852,15 +881,16 @@ function drawTrajectory(traj) {
   const releasePt = traj.path[traj.releaseIdx];
   state.releaseMarker = sigMarker(releasePt.lat, releasePt.lon, 'release').addTo(state.map)
     .bindPopup(`Burst / release<br>${Math.round(releasePt.alt)} m AMSL`);
+  attachPointZoom(state.releaseMarker);
 
   const land = traj.path[traj.path.length - 1];
   state.landMarker = sigMarker(land.lat, land.lon, 'land').addTo(state.map)
     .bindPopup(`Predicted landing<br>${land.lat.toFixed(4)}, ${land.lon.toFixed(4)}`);
+  attachPointZoom(state.landMarker);
 
   // Launch marker on top again for clarity
   if (state.launchMarker.setZIndexOffset) state.launchMarker.setZIndexOffset(400);
 
-  state.map.fitBounds(state.trajectoryLine.getBounds(), { padding: [40, 40] });
 }
 
 // ---------------------------------------------------------------------
@@ -959,6 +989,7 @@ async function reverseCalcFromLanding(targetLat, targetLon) {
     drawTrajectory(result.traj);
     drawProfile(result.traj);
     openResults();
+    setTimeout(fitFlightPath, 320);
 
     const finalErr = haversine(targetLat, targetLon, result.traj.landing.lat, result.traj.landing.lon);
     setStatus('Launch site back-solved', `landing ${(finalErr / 1000).toFixed(1)} km from target`);
@@ -1236,6 +1267,10 @@ function wireUI() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  if (typeof L === 'undefined') {
+    if (window.__appError) window.__appError('Leaflet (map library) failed to load from cdn.jsdelivr.net \u2014 check the network connection or a content blocker, then reload.');
+    return;
+  }
   const safe = (label, fn) => { try { fn(); } catch (e) { console.error(label, e); } };
 
   safe('theme', () => {
