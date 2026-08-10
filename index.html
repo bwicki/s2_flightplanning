@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
 <div id="app">
@@ -70,7 +70,7 @@
       <div id="versionChip" class="version-badge"></div>
     </div>
 
-    <div id="resultsHandle" class="closed" title="Show / hide results">▶</div>
+    <div id="resultsHandle" class="side-handle handle-results closed" title="Show / hide results"><span class="hbadge">2</span><span class="hlbl">Resulting flight data</span></div>
 
     <!-- ============ RESULTS DRAWER (left) ============ -->
     <div id="resultsDrawer" class="collapsed">
@@ -106,7 +106,7 @@
       </div>
     </div>
 
-    <div id="drawerHandle" title="Show / hide settings">▶</div>
+    <div id="drawerHandle" class="side-handle handle-params" title="Show / hide parameters"><span class="hbadge">1</span><span class="hlbl">Parameters</span></div>
 
     <!-- ============ SETTINGS DRAWER (right) ============ -->
     <div id="menuDrawer">
@@ -254,6 +254,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

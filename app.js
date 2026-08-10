@@ -534,7 +534,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.11.0 · 2026-08-10';
+const APP_VERSION = 'v1.12.0 · 2026-08-10';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -585,6 +585,7 @@ function initMap() {
       reverseCalcFromLanding(e.latlng.lat, e.latlng.lng).catch(showError);
     } else {
       setLaunchPoint(e.latlng.lat, e.latlng.lng);
+      runCalculation().catch(showError);
     }
   });
 
@@ -693,7 +694,7 @@ function openResults() {
   const d = $('resultsDrawer');
   const h = $('resultsHandle');
   if (d) d.classList.remove('collapsed');
-  if (h) { h.classList.remove('closed'); h.textContent = '\u25C0'; }
+  if (h) h.classList.remove('closed');
   const fab = $('resultsOpenBtn');
   if (fab) fab.hidden = false;
 }
@@ -701,7 +702,7 @@ function closeResults() {
   const d = $('resultsDrawer');
   const h = $('resultsHandle');
   if (d) d.classList.add('collapsed');
-  if (h) { h.classList.add('closed'); h.textContent = '\u25B6'; }
+  if (h) h.classList.add('closed');
 }
 function toggleResults() {
   const d = $('resultsDrawer');
@@ -794,7 +795,7 @@ async function runCalculation() {
   const drawer = $('menuDrawer');
   if (drawer) drawer.classList.add('collapsed');
   const dh = $('drawerHandle');
-  if (dh) { dh.classList.add('closed'); dh.textContent = '◀'; }
+  if (dh) dh.classList.add('closed');
   setStatus('Fetching weather…', 'wind + pressure levels');
   try {
     const lat = parseFloat($('launchLat').value);
@@ -1107,10 +1108,7 @@ function wireUI() {
     if (!d) return;
     if (open === undefined) open = d.classList.contains('collapsed');
     d.classList.toggle('collapsed', !open);
-    if (h) {
-      h.classList.toggle('closed', !open);
-      h.textContent = open ? '▶' : '◀';
-    }
+    if (h) h.classList.toggle('closed', !open);
     setTimeout(() => { if (state.map) state.map.invalidateSize(); }, 280);
   };
   on('menuBtn', 'click', () => toggleDrawer());
