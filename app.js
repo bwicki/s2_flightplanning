@@ -463,10 +463,15 @@ function setLaunchPoint(lat, lon) {
   $('launchLat').value = lat.toFixed(5);
   $('launchLon').value = lon.toFixed(5);
   state.launchMarker.setLatLng([lat, lon]);
-  setStatus(`Launch site set to ${lat.toFixed(4)}, ${lon.toFixed(4)}. Press "Calculate flight" to update the prediction.`);
+  setStatus('Launch site set', `${lat.toFixed(4)}, ${lon.toFixed(4)} — press Calculate`);
 }
 
-function setStatus(msg) { $('statusLine').textContent = msg; }
+function setStatus(msg, sub) {
+  const line = $('statusLine');
+  if (line) line.textContent = msg;
+  const s = $('statusSub');
+  if (s) s.textContent = sub || '';
+}
 
 function setSearchStatus(msg, kind) {
   const box = $('searchStatus');
@@ -483,6 +488,7 @@ function nowDefaults() {
 }
 
 function applyTheme(theme) {
+  document.body.classList.toggle('day', theme === 'light');
   document.documentElement.setAttribute('data-theme', theme);
   const btn = $('themeToggle');
   if (btn) btn.textContent = theme === 'light' ? '◑' : '◐';
@@ -529,10 +535,24 @@ async function searchPlace() {
   }
 }
 
+// ---------------------------------------------------------------------
+// Results modal
+// ---------------------------------------------------------------------
+function openResults() {
+  const m = $('resultsModal');
+  if (m) m.hidden = false;
+  const fab = $('resultsOpenBtn');
+  if (fab) fab.hidden = false;
+}
+function closeResults() {
+  const m = $('resultsModal');
+  if (m) m.hidden = true;
+}
+
 function showError(e) {
   console.error(e);
   $('calcError').textContent = e.message || String(e);
-  setStatus('Calculation failed — see message under the form.');
+  setStatus('Calculation failed', 'see message under the form');
   state.busy = false;
 }
 
@@ -611,7 +631,7 @@ async function runCalculation() {
   if (state.busy) return;
   state.busy = true;
   $('calcError').textContent = '';
-  setStatus('Fetching weather and wind data…');
+  setStatus('Fetching weather…', 'wind + pressure levels');
   try {
     const lat = parseFloat($('launchLat').value);
     const lon = parseFloat($('launchLon').value);
@@ -620,7 +640,8 @@ async function runCalculation() {
     renderResults(r);
     drawTrajectory(r.traj);
     drawProfile(r.traj);
-    setStatus(r.note || `Calculation complete — matched weather at ${r.weather.matchedTime} UTC.`);
+    openResults();
+    setStatus(r.note ? 'Note — see form' : 'Calculation complete', `wx: ${r.weather.matchedTime} UTC`);
   } finally {
     state.busy = false;
   }
@@ -732,7 +753,7 @@ async function reverseCalcFromLanding(targetLat, targetLon) {
     state.targetMarker = L.circleMarker([targetLat, targetLon], markerStyle('target')).addTo(state.map)
       .bindPopup(`Desired landing<br>${targetLat.toFixed(4)}, ${targetLon.toFixed(4)}`).openPopup();
 
-    setStatus('Back-solving launch site for the desired landing point…');
+    setStatus('Back-solving launch site…', 'iterating against wind field');
     $('calcError').textContent = '';
 
     // Start from the current launch coordinates; if no calculation exists
@@ -763,9 +784,10 @@ async function reverseCalcFromLanding(targetLat, targetLon) {
     renderResults(result);
     drawTrajectory(result.traj);
     drawProfile(result.traj);
+    openResults();
 
     const finalErr = haversine(targetLat, targetLon, result.traj.landing.lat, result.traj.landing.lon);
-    setStatus(`Back-solved launch site — predicted landing is ${(finalErr / 1000).toFixed(1)} km from the desired point (wind-model approximation).`);
+    setStatus('Launch site back-solved', `landing ${(finalErr / 1000).toFixed(1)} km from target`);
   } finally {
     state.busy = false;
   }
@@ -831,14 +853,14 @@ function loadStateFromUrl() {
   try {
     const inputs = JSON.parse(decodeURIComponent(atob(encoded)));
     applyInputs(inputs);
-    setStatus('Loaded flight parameters from shared link. Press "Calculate flight" to run the prediction.');
+    setStatus('Link parameters loaded', 'press Calculate to run');
   } catch (e) { /* malformed */ }
 }
 
 function exportImage() {
   if (typeof html2canvas === 'undefined') { setStatus('Image export library failed to load.'); return; }
   setStatus('Rendering image export…');
-  html2canvas($('resultsPanel'), { backgroundColor: null, useCORS: true }).then(canvas => {
+  html2canvas($('resultsCard'), { backgroundColor: null, useCORS: true }).then(canvas => {
     const a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');
     a.download = `sonde-flight-plan-${Date.now()}.png`;
@@ -896,6 +918,29 @@ function wireUI() {
   on('printBtn', 'click', () => window.print());
   on('copyLinkBtn', 'click', copyShareLink);
   on('exportImageBtn', 'click', exportImage);
+
+  // Results modal controls
+  on('resultsCloseBtn', 'click', closeResults);
+  on('resultsOpenBtn', 'click', openResults);
+  on('resultsModal', 'click', e => { if (e.target === $('resultsModal')) closeResults(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeResults(); });
+
+  // Sidebar collapse handle (cockpit idiom)
+  on('sidebarHandle', 'click', () => {
+    const sb = $('sidebar');
+    sb.classList.toggle('collapsed');
+    $('sidebarHandle').textContent = sb.classList.contains('collapsed') ? '◀' : '▶';
+    setTimeout(() => { if (state.map) state.map.invalidateSize(); }, 280);
+  });
+  if ($('sidebarHandle')) $('sidebarHandle').textContent = '▶';
+
+  // Collapsible cards
+  document.querySelectorAll('.card > h3').forEach(h => {
+    h.addEventListener('click', () => h.parentElement.classList.toggle('collapsed'));
+  });
+
+  // Keep map sized correctly on orientation change / resize (iPad)
+  window.addEventListener('resize', () => { if (state.map) setTimeout(() => state.map.invalidateSize(), 150); });
 }
 
 window.addEventListener('DOMContentLoaded', () => {

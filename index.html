@@ -2,261 +2,221 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='24' r='18' fill='%233fd0c9'/%3E%3Cpath d='M26 40 L32 52 L38 40 Z' fill='%23ffb454'/%3E%3Crect x='29' y='52' width='6' height='6' rx='1' fill='%23e6edf3'/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sonde Planner">
+<meta name="mobile-web-app-capable" content="yes">
 <title>Weather Sonde Flight Planning</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
+<div id="app">
 
-<header class="topbar">
-  <div class="brand">
-    <span class="brand-mark" aria-hidden="true"></span>
-    <div class="brand-text">
-      <h1>Weather Sonde Flight Planning</h1>
-      <p>Weather sounding balloon ascent &amp; drift predictor</p>
+  <!-- ================= TOPBAR ================= -->
+  <div id="topbar">
+    <span class="title">SONDE FLIGHT PLANNING</span>
+    <div class="sep"></div>
+    <div id="modeSwitch" class="mode-toggle" role="radiogroup" aria-label="Map click mode">
+      <label><input type="radio" name="searchMode" value="forward" checked><span>⬈ Forward</span></label>
+      <label><input type="radio" name="searchMode" value="backward"><span>⬊ Backward</span></label>
+    </div>
+    <div class="sep"></div>
+    <div class="legend-chips">
+      <span><i class="dot launch"></i>Launch</span>
+      <span><i class="dot release"></i>Burst</span>
+      <span><i class="dot land"></i>Landing</span>
+      <span><i class="dot target"></i>Target</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="wx-chip" id="statusChip"><b id="statusLine">Ready</b><span id="statusSub">set parameters &amp; calculate</span></div>
+    <button type="button" id="resultsOpenBtn" class="iconbtn" hidden title="Show results">📊</button>
+    <button type="button" id="themeToggle" class="iconbtn" title="Toggle day / night theme">◐</button>
+  </div>
+
+  <!-- ================= MAIN ================= -->
+  <div id="main">
+    <div id="mapwrap"><div id="map"></div></div>
+
+    <div id="sidebarHandle" title="Show / hide panel">◀</div>
+
+    <div id="sidebar">
+
+      <div class="card">
+        <h3>01 · Payload <span class="chev">▾</span></h3>
+        <div class="cardbody">
+          <div class="frow"><label for="sondeType">Sonde type</label>
+            <select id="sondeType">
+              <option value="sparv-s2" data-weight="9" selected>SparvEmbedded S2 (9 g)</option>
+              <option value="custom" data-weight="9">Custom…</option>
+            </select>
+          </div>
+          <div class="frow"><label for="sondeWeight">Sonde weight (g)</label>
+            <input type="number" id="sondeWeight" value="9" min="1" step="0.5">
+          </div>
+          <div class="frow"><label for="riggingWeight">Rigging etc. (g)</label>
+            <input type="number" id="riggingWeight" value="5" min="0" step="0.5">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>02 · Balloon <span class="chev">▾</span></h3>
+        <div class="cardbody">
+          <div class="frow"><label for="balloonType">Balloon type</label>
+            <select id="balloonType"></select>
+          </div>
+          <div class="frow"><label>Presets</label>
+            <div class="btn-row">
+              <button type="button" id="addPresetBtn" class="ghost">+ Add</button>
+              <button type="button" id="editPresetBtn" class="ghost">Edit</button>
+              <button type="button" id="deletePresetBtn" class="ghost">Del</button>
+            </div>
+          </div>
+          <div class="frow"><label for="balloonWeight">Balloon weight (g)</label>
+            <input type="number" id="balloonWeight" value="9" min="1" step="1">
+          </div>
+          <div class="frow"><label for="burstDiameterOverride">Burst Ø override (m)</label>
+            <input type="number" id="burstDiameterOverride" placeholder="auto" min="0.1" step="0.01">
+          </div>
+          <p class="hint" id="burstDiameterHint"></p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>03 · Fill gas <span class="chev">▾</span></h3>
+        <div class="cardbody">
+          <div class="frow"><label for="gasType">Fill gas</label>
+            <select id="gasType">
+              <option value="ballongas-linde" data-lift="0.90" selected>Ballongas (Linde)</option>
+              <option value="helium" data-lift="1.045">Helium (pure)</option>
+              <option value="hydrogen" data-lift="1.135">Hydrogen</option>
+              <option value="custom" data-lift="0.90">Custom…</option>
+            </select>
+          </div>
+          <div class="frow"><label for="gasLift">Lift (kg/m³ @SL)</label>
+            <input type="number" id="gasLift" value="0.90" min="0.1" step="0.01">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>04 · Launch site &amp; time <span class="chev">▾</span></h3>
+        <div class="cardbody">
+          <div class="frow"><label for="placeSearch">Location</label>
+            <div class="btn-row">
+              <input type="text" id="placeSearch" placeholder="Place name…">
+              <button type="button" id="searchBtn" class="ghost">Find</button>
+              <button type="button" id="geolocateBtn" class="ghost" title="Use current device position">⦿</button>
+            </div>
+          </div>
+          <div class="status-box" id="searchStatus"></div>
+          <div class="frow"><label for="launchLat">Lat / Lon</label>
+            <div class="pair">
+              <input type="number" id="launchLat" value="47.3769" step="0.0001">
+              <input type="number" id="launchLon" value="8.5417" step="0.0001">
+            </div>
+          </div>
+          <div class="frow"><label for="launchDate">Date / time UTC</label>
+            <div class="pair">
+              <input type="date" id="launchDate">
+              <input type="time" id="launchTime" step="60">
+            </div>
+          </div>
+          <div class="frow"><label for="weatherModel">Weather model</label>
+            <select id="weatherModel">
+              <option value="" selected>Best match (auto)</option>
+              <option value="gfs_seamless">GFS (NOAA)</option>
+              <option value="icon_seamless">ICON (DWD)</option>
+              <option value="ecmwf_ifs025">ECMWF IFS 0.25°</option>
+              <option value="gem_seamless">GEM (Canada)</option>
+              <option value="meteofrance_seamless">ARPEGE/AROME (MF)</option>
+              <option value="ukmo_seamless">UKMO</option>
+              <option value="jma_seamless">JMA</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>05 · Flight profile <span class="chev">▾</span></h3>
+        <div class="cardbody">
+          <div class="frow"><label for="targetMode">Ascent target</label>
+            <select id="targetMode">
+              <option value="altitude" selected>Fixed altitude (m AMSL)</option>
+              <option value="burst">Ascend to burst height</option>
+            </select>
+          </div>
+          <div class="frow" id="targetAltitudeWrap"><label for="targetAltitude">Release alt. (m AMSL)</label>
+            <input type="number" id="targetAltitude" value="5500" min="100" step="100">
+          </div>
+          <div class="frow"><label for="ascentRate">Ascent rate</label>
+            <select id="ascentRate">
+              <option value="1.0">1.0 m/s</option>
+              <option value="1.5">1.5 m/s</option>
+              <option value="2.0">2.0 m/s</option>
+              <option value="2.5" selected>2.5 m/s</option>
+              <option value="3.0">3.0 m/s</option>
+              <option value="3.5">3.5 m/s</option>
+              <option value="4.0">4.0 m/s</option>
+            </select>
+          </div>
+          <div class="frow"><label for="descentRate">Descent rate (m/s @SL)</label>
+            <input type="number" id="descentRate" value="5" min="1" max="15" step="0.5">
+          </div>
+        </div>
+      </div>
+
+      <button type="button" id="calcBtn" class="primary">Calculate flight</button>
+      <p class="hint err" id="calcError" role="alert"></p>
     </div>
   </div>
-  <div class="topbar-right">
-    <div class="topbar-status" id="statusLine">Set launch parameters to begin.</div>
-    <button type="button" id="themeToggle" class="btn-icon" title="Toggle light / dark theme" aria-label="Toggle light / dark theme">◐</button>
-  </div>
-</header>
 
-<main class="layout">
+</div>
 
-  <!-- ============ LEFT: PAYLOAD / BALLOON / GAS ============ -->
-  <section class="panel input-panel" aria-label="Payload and balloon parameters">
-
-    <div class="field-group">
-      <h2><span class="idx">01</span> Payload</h2>
-      <label for="sondeType">Sonde type</label>
-      <select id="sondeType">
-        <option value="sparv-s2" data-weight="9" selected>SparvEmbedded S2 (9 g)</option>
-        <option value="custom" data-weight="9">Custom…</option>
-      </select>
-      <div class="row-2">
-        <div>
-          <label for="sondeWeight">Sonde weight (g)</label>
-          <input type="number" id="sondeWeight" value="9" min="1" step="0.5">
-        </div>
-        <div>
-          <label for="riggingWeight">Rigging / line / parachute (g)</label>
-          <input type="number" id="riggingWeight" value="5" min="0" step="0.5">
-        </div>
-      </div>
-    </div>
-
-    <div class="field-group">
-      <h2><span class="idx">02</span> Balloon</h2>
-      <label for="balloonType">Balloon type</label>
-      <select id="balloonType"></select>
-      <div class="row-inline preset-actions">
-        <button type="button" id="addPresetBtn" class="btn-secondary">+ Add preset</button>
-        <button type="button" id="editPresetBtn" class="btn-secondary">Edit</button>
-        <button type="button" id="deletePresetBtn" class="btn-secondary">Delete</button>
-      </div>
-      <div class="row-2">
-        <div>
-          <label for="balloonWeight">Balloon weight (g)</label>
-          <input type="number" id="balloonWeight" value="9" min="1" step="1">
-        </div>
-        <div>
-          <label for="burstDiameterOverride">Burst diameter override (m, optional)</label>
-          <input type="number" id="burstDiameterOverride" placeholder="auto" min="0.1" step="0.01">
-        </div>
-      </div>
-      <p class="hint" id="burstDiameterHint"></p>
-    </div>
-
-    <div class="field-group">
-      <h2><span class="idx">03</span> Fill gas</h2>
-      <label for="gasType">Fill gas</label>
-      <select id="gasType">
-        <option value="ballongas-linde" data-lift="0.90" selected>Ballongas (Linde, He/air blend)</option>
-        <option value="helium" data-lift="1.045">Helium (pure)</option>
-        <option value="hydrogen" data-lift="1.135">Hydrogen</option>
-        <option value="custom" data-lift="0.90">Custom…</option>
-      </select>
-      <label for="gasLift">Lifting power at sea level (kg lift / m³)</label>
-      <input type="number" id="gasLift" value="0.90" min="0.1" step="0.01">
-      <p class="hint">Ballongas is a helium/air blend; exact lift depends on mix ratio &mdash; adjust if your supplier states a different value.</p>
-    </div>
-  </section>
-
-  <!-- ============ RIGHT: MAP + LAUNCH SITE/TIME + FLIGHT PROFILE ============ -->
-  <section class="panel map-panel" aria-label="Map and flight setup">
-
-    <div class="map-toolbar">
-      <div class="mode-switch" role="radiogroup" aria-label="Map click mode" id="modeSwitch">
-        <label class="mode-opt">
-          <input type="radio" name="searchMode" value="forward" checked>
-          <span title="Click on the map to set the launch site; the landing site is predicted.">⬈ Forward &mdash; set launch, predict landing</span>
-        </label>
-        <label class="mode-opt">
-          <input type="radio" name="searchMode" value="backward">
-          <span title="Click on the map to set the desired landing site; a matching launch site is back-solved.">⬊ Backward &mdash; set landing, solve launch</span>
-        </label>
-      </div>
-      <div class="map-legend-inline">
-        <span><i class="dot launch"></i> Launch</span>
-        <span><i class="dot release"></i> Burst / release</span>
-        <span><i class="dot land"></i> Landing</span>
-        <span><i class="dot target"></i> Desired landing</span>
-      </div>
-    </div>
-
-    <div id="map"></div>
-
-    <div class="field-group">
-      <h2><span class="idx">04</span> Launch site &amp; time</h2>
-      <label for="placeSearch">Location search</label>
-      <div class="row-inline">
-        <input type="text" id="placeSearch" placeholder="Place name…">
-        <button type="button" id="searchBtn" class="btn-secondary">Find</button>
-        <button type="button" id="geolocateBtn" class="btn-secondary" title="Use current device position">⦿ My position</button>
-      </div>
-      <div class="status-box" id="searchStatus"></div>
-      <div class="row-2">
-        <div>
-          <label for="launchLat">Latitude</label>
-          <input type="number" id="launchLat" value="47.3769" step="0.0001">
-        </div>
-        <div>
-          <label for="launchLon">Longitude</label>
-          <input type="number" id="launchLon" value="8.5417" step="0.0001">
-        </div>
-      </div>
-      <div class="row-2">
-        <div>
-          <label for="launchDate">Launch date (UTC)</label>
-          <input type="date" id="launchDate">
-        </div>
-        <div>
-          <label for="launchTime">Launch time (UTC)</label>
-          <input type="time" id="launchTime" step="60">
-        </div>
-      </div>
-      <label for="weatherModel">Weather model</label>
-      <select id="weatherModel">
-        <option value="" selected>Best match (automatic blend)</option>
-        <option value="gfs_seamless">GFS (NOAA, global)</option>
-        <option value="icon_seamless">ICON (DWD, global/Europe)</option>
-        <option value="ecmwf_ifs025">ECMWF IFS 0.25°</option>
-        <option value="gem_seamless">GEM (Environment Canada)</option>
-        <option value="meteofrance_seamless">ARPEGE/AROME (Météo-France)</option>
-        <option value="ukmo_seamless">UKMO (UK Met Office)</option>
-        <option value="jma_seamless">JMA (Japan Meteorological Agency)</option>
-      </select>
-      <p class="hint">Not every model publishes the same set of pressure levels &mdash; if a level is missing for the chosen model, the app falls back to the nearest available one.</p>
-    </div>
-
-    <div class="field-group">
-      <h2><span class="idx">05</span> Flight profile</h2>
-      <label for="targetMode">Ascent target</label>
-      <select id="targetMode">
-        <option value="altitude" selected>Release at fixed altitude (m AMSL)</option>
-        <option value="burst">Ascend to burst height</option>
-      </select>
-      <div id="targetAltitudeWrap">
-        <label for="targetAltitude">Release / cutdown altitude (m AMSL)</label>
-        <input type="number" id="targetAltitude" value="5500" min="100" step="100">
-      </div>
-      <label for="ascentRate">Target ascent rate (m/s)</label>
-      <select id="ascentRate">
-        <option value="1.0">1.0 m/s</option>
-        <option value="1.5">1.5 m/s</option>
-        <option value="2.0">2.0 m/s</option>
-        <option value="2.5" selected>2.5 m/s</option>
-        <option value="3.0">3.0 m/s</option>
-        <option value="3.5">3.5 m/s</option>
-        <option value="4.0">4.0 m/s</option>
-      </select>
-      <label for="descentRate">Parachute descent rate at sea level (m/s)</label>
-      <input type="number" id="descentRate" value="5" min="1" max="15" step="0.5">
-    </div>
-
-    <button type="button" id="calcBtn" class="btn-primary">Calculate flight</button>
-    <p class="hint" id="calcError" role="alert"></p>
-  </section>
-
-  <!-- ============ RESULTS (full width) ============ -->
-  <section class="panel results-panel" aria-label="Calculation results" id="resultsPanel">
+<!-- ================= RESULTS MODAL ================= -->
+<div class="overlay" id="resultsModal" hidden>
+  <section class="overlay-box" id="resultsCard" role="dialog" aria-modal="true" aria-label="Calculation results">
+    <button type="button" id="resultsCloseBtn" class="overlay-close" title="Close results" aria-label="Close results">✕</button>
     <div class="results-header">
-      <h2><span class="idx">06</span> Results</h2>
+      <h2>06 · Results</h2>
       <div class="export-actions">
-        <button type="button" id="exportJsonBtn" class="btn-secondary">⭳ Save (JSON)</button>
-        <button type="button" id="printBtn" class="btn-secondary">🖶 Print</button>
-        <button type="button" id="copyLinkBtn" class="btn-secondary">🔗 Copy link</button>
-        <button type="button" id="exportImageBtn" class="btn-secondary">🖼 Export image</button>
+        <button type="button" id="exportJsonBtn" class="ghost">⭳ JSON</button>
+        <button type="button" id="printBtn" class="ghost">🖶 Print</button>
+        <button type="button" id="copyLinkBtn" class="ghost">🔗 Link</button>
+        <button type="button" id="exportImageBtn" class="ghost">🖼 Image</button>
       </div>
     </div>
 
     <div class="results-body">
-      <div class="result-grid">
-        <div class="result-card">
-          <span class="label">Local surface pressure</span>
-          <span class="value" id="resPressure">—</span>
-        </div>
-        <div class="result-card">
-          <span class="label">Gross lift (before payload)</span>
-          <span class="value" id="resGrossLift">—</span>
-        </div>
-        <div class="result-card">
-          <span class="label">Net lift (after payload)</span>
-          <span class="value" id="resNetLift">—</span>
-        </div>
-        <div class="result-card">
-          <span class="label">Required gas volume</span>
-          <span class="value" id="resGasVolume">—</span>
-        </div>
-        <div class="result-card">
-          <span class="label">Inflated diameter</span>
-          <span class="value" id="resDiameter">—</span>
-        </div>
-        <div class="result-card">
-          <span class="label">Predicted burst altitude</span>
-          <span class="value" id="resBurstAlt">—</span>
-        </div>
-        <div class="result-card">
-          <span class="label">Ascent time</span>
-          <span class="value" id="resAscentTime">—</span>
-        </div>
-        <div class="result-card">
-          <span class="label">Total flight time</span>
-          <span class="value" id="resFlightTime">—</span>
-        </div>
-        <div class="result-card">
-          <span class="label">Landing distance from launch</span>
-          <span class="value" id="resDistance">—</span>
-        </div>
-        <div class="result-card">
-          <span class="label">Tropopause (from weather model)</span>
-          <span class="value" id="resTropopause">—</span>
-        </div>
-        <div class="result-card wide">
-          <span class="label">Weather data used</span>
-          <span class="value" id="resWeatherSource">—</span>
-        </div>
+      <div class="datagrid">
+        <div class="datacell"><label>Surface pressure</label><span class="val" id="resPressure">—</span></div>
+        <div class="datacell"><label>Gross lift</label><span class="val" id="resGrossLift">—</span></div>
+        <div class="datacell"><label>Net lift</label><span class="val" id="resNetLift">—</span></div>
+        <div class="datacell"><label>Gas volume</label><span class="val" id="resGasVolume">—</span></div>
+        <div class="datacell"><label>Inflated Ø</label><span class="val" id="resDiameter">—</span></div>
+        <div class="datacell"><label>Burst altitude</label><span class="val" id="resBurstAlt">—</span></div>
+        <div class="datacell"><label>Ascent time</label><span class="val" id="resAscentTime">—</span></div>
+        <div class="datacell"><label>Total flight time</label><span class="val" id="resFlightTime">—</span></div>
+        <div class="datacell"><label>Landing distance</label><span class="val" id="resDistance">—</span></div>
+        <div class="datacell"><label>Tropopause (model)</label><span class="val" id="resTropopause">—</span></div>
+        <div class="datacell wide"><label>Weather data used</label><span class="val small" id="resWeatherSource">—</span></div>
       </div>
 
       <div class="profile-box">
-        <span class="label">Ascent / descent profile</span>
+        <label>Ascent / descent profile</label>
         <svg id="profileSvg" viewBox="0 0 420 280" preserveAspectRatio="xMidYMid meet"></svg>
       </div>
     </div>
+
+    <p class="hint disclaimer">Approximations for mission planning — cross-check against manufacturer data and NOTAM / airspace rules before launch. Weather: Open-Meteo.</p>
   </section>
+</div>
 
-</main>
-
-<footer class="footer">
-  <p>Weather &amp; wind data: Open‑Meteo. Balloon burst diameters, drag and gas‑expansion model are approximations for mission planning &mdash; always cross‑check against your balloon manufacturer's data sheet and current NOTAM / airspace rules before launch.</p>
-</footer>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=3"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
