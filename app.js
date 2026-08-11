@@ -530,7 +530,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.30.0 · 2026-08-10';
+const APP_VERSION = 'v1.34.0 · 2026-08-10';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -602,7 +602,7 @@ function initMap() {
   state.map.addControl(new BaseLayerRadioControl());
 
   state.launchMarker = sigMarker(parseFloat($('launchLat').value), parseFloat($('launchLon').value), 'launch').addTo(state.map);
-  attachPointZoom(state.launchMarker);
+  attachPointZoom(state.launchMarker, ll => `Launch site<br>${ll.lat.toFixed(4)}, ${ll.lng.toFixed(4)}`);
 
   state.map.on('click', (e) => {
     if (state.busy) return;
@@ -657,11 +657,11 @@ function setSearchStatus(msg, kind) {
 }
 
 function nowDefaults() {
-  const now = new Date();
+  // Default launch time: 45 minutes from now (rounded up to 5 min), UTC core.
+  const now = new Date(Date.now() + 45 * 60000);
+  now.setUTCMinutes(Math.ceil(now.getUTCMinutes() / 5) * 5, 0, 0);
   $('launchDate').value = now.toISOString().slice(0, 10);
-  const hh = String(now.getUTCHours()).padStart(2, '0');
-  const mm = String(now.getUTCMinutes()).padStart(2, '0');
-  $('launchTime').value = `${hh}:${mm}`;
+  $('launchTime').value = now.toISOString().slice(11, 16);
 }
 
 function applyTheme(theme) {
@@ -889,9 +889,17 @@ function renderResults(r) {
 }
 
 // Zoom fully onto a key point when its marker is clicked
-function attachPointZoom(marker) {
+function attachPointZoom(marker, labelFn) {
   marker.on('click', () => {
-    state.map.flyTo(marker.getLatLng(), Math.max(state.map.getZoom(), 15), { duration: 0.6 });
+    const ll = marker.getLatLng();
+    let z = 18;
+    try { z = Math.min(state.map.getMaxZoom() || 18, 19); } catch (e) { /* keep 18 */ }
+    if (!isFinite(z)) z = 18;
+    state.map.flyTo(ll, z, { duration: 0.8 });
+    const gmaps = `https://www.google.com/maps/search/?api=1&query=${ll.lat.toFixed(6)},${ll.lng.toFixed(6)}`;
+    const base = labelFn ? labelFn(ll) : (marker._baseHtml || '');
+    marker.bindPopup(`${base}<br><a class="gmaps-link" href="${gmaps}" target="_blank" rel="noopener">Open in Google Maps ↗</a>`, { autoClose: false });
+    setTimeout(() => marker.openPopup(), 850);
   });
 }
 
@@ -1008,11 +1016,13 @@ function drawTrajectory(traj) {
   const releasePt = traj.path[traj.releaseIdx];
   state.releaseMarker = sigMarker(releasePt.lat, releasePt.lon, 'release').addTo(state.map)
     .bindPopup(`Burst / release<br>${Math.round(releasePt.alt)} m AMSL`);
+  state.releaseMarker._baseHtml = `Burst / release<br>${Math.round(releasePt.alt)} m AMSL`;
   attachPointZoom(state.releaseMarker);
 
   const land = traj.path[traj.path.length - 1];
   state.landMarker = sigMarker(land.lat, land.lon, 'land').addTo(state.map)
     .bindPopup(`Predicted landing<br>${land.lat.toFixed(4)}, ${land.lon.toFixed(4)}`);
+  state.landMarker._baseHtml = `Predicted landing<br>${land.lat.toFixed(4)}, ${land.lon.toFixed(4)}`;
   attachPointZoom(state.landMarker);
 
   // Launch marker on top again for clarity
@@ -1328,7 +1338,8 @@ const AS_CATS = [
   { id: 'p',      label: 'Prohibited (P)',   types: [3],      color: '#e0483f', def: true },
   { id: 'r',      label: 'Restricted (R)',   types: [1],      color: '#e07a3f', def: false },
   { id: 'd',      label: 'Danger (D)',       types: [2],      color: '#e0b400', def: false },
-  { id: 'tma',    label: 'TMA / CTA',        types: [7, 26],  color: '#7a9bd0', def: false },
+  { id: 'tma',    label: 'TMA',              types: [7],      color: '#7a9bd0', def: true },
+  { id: 'cta',    label: 'CTA (administrative)', types: [26], color: '#93a3b5', def: false },
   { id: 'tmz',    label: 'TMZ / RMZ',        types: [5, 6],   color: '#8cd0c9', def: false },
   { id: 'atz',    label: 'ATZ',              types: [13],     color: '#b78cff', def: false },
   { id: 'glider', label: 'Gliding sectors',  types: [21],     color: '#3fd06b', def: false },
@@ -1336,13 +1347,13 @@ const AS_CATS = [
 
 function asPrefs() {
   try {
-    const p = JSON.parse(localStorage.getItem('sfp_airspace') || '{}');
+    const p = JSON.parse(localStorage.getItem('sfp_airspace_v2') || '{}');
     if (!p.cats) p.cats = {};
     AS_CATS.forEach(c => { if (p.cats[c.id] === undefined) p.cats[c.id] = c.def; });
     return p;
   } catch (e) { const p = { cats: {} }; AS_CATS.forEach(c => p.cats[c.id] = c.def); return p; }
 }
-function saveAsPrefs(p) { try { localStorage.setItem('sfp_airspace', JSON.stringify(p)); } catch (e) { /* ignore */ } }
+function saveAsPrefs(p) { try { localStorage.setItem('sfp_airspace_v2', JSON.stringify(p)); } catch (e) { /* ignore */ } }
 
 function enabledAsTypes() {
   const p = asPrefs();
@@ -1486,12 +1497,16 @@ async function checkAirspaceViolations(traj) {
   });
   if (hits.size === 0) {
     warnEl.hidden = false;
+    warnEl.classList.remove('conflict');
+    warnEl.classList.add('clear');
     warnEl.innerHTML = '<b style="color:var(--good);">✓ No conflict</b> with the enabled airspace categories (approximate check).';
     return;
   }
   const rows = [...hits.values()].map(h =>
     `<li><b>${h.it.name || 'Airspace'}</b> (${h.cat.label}, ${asLimitText(h.it.lowerLimit)} – ${asLimitText(h.it.upperLimit)}) — crossed at ${Math.round(h.minAlt)}–${Math.round(h.maxAlt)} m AMSL</li>`).join('');
   warnEl.hidden = false;
+  warnEl.classList.remove('clear');
+  warnEl.classList.add('conflict');
   warnEl.innerHTML = `<b>⚠ Airspace conflict</b> — trajectory enters ${hits.size} enabled airspace${hits.size > 1 ? 's' : ''}:<ul>${rows}</ul>`;
   setStatus('⚠ Airspace conflict', [...hits.values()].map(h => h.it.name).slice(0, 2).join(', '));
   // Highlight the offending polygons on the map
@@ -1634,8 +1649,8 @@ function wireUI() {
   // Compact launch-time box (S4d): fields edit in UTC or device local time,
   // the small line below always shows the conversion into the other zone.
   // Internally everything stays UTC (weather API, main card 04).
-  let qTz = 'utc';
-  try { qTz = localStorage.getItem('sfp_tz') || 'utc'; } catch (e) { /* ignore */ }
+  let qTz = 'lt';
+  try { qTz = localStorage.getItem('sfp_tz') || 'lt'; } catch (e) { /* ignore */ }
 
   const mainUtcDate = () => {
     const d = $('launchDate').value, t = $('launchTime').value;

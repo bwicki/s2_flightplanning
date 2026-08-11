@@ -51,7 +51,7 @@
 </script>
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=30">
+<link rel="stylesheet" href="style.css?v=34">
 </head>
 <body>
 <div id="app">
@@ -178,10 +178,10 @@
         <button type="button" id="qNowBtn" class="ghost">now</button>
       </div>
       <div id="releaseSliderBox" title="Release altitude">
-        <div class="rs-head"><span class="rs-lbl">Release</span><b id="lblReleaseAlt">3800</b><span class="rs-unit">m AMSL</span></div>
+        <div class="rs-head"><span class="rs-lbl">Release</span><b id="lblReleaseAlt">3750</b><span class="rs-unit">m AMSL</span></div>
         <div class="rs-scale">
           <span class="rs-tick">7000</span>
-          <div class="vslider-wrap"><input type="range" id="sReleaseAlt" min="500" max="7000" step="250" value="3800"></div>
+          <div class="vslider-wrap"><input type="range" id="sReleaseAlt" min="500" max="7000" step="250" value="3750"></div>
           <span class="rs-tick">500</span>
         </div>
       </div>
@@ -300,7 +300,7 @@
                 </select>
               </div>
               <div class="fcell" id="targetAltitudeWrap"><label for="targetAltitude">Release altitude</label>
-                <div class="iwrap"><input type="number" id="targetAltitude" value="3800" min="500" max="7000" step="250"><span class="iunit">m AMSL</span></div>
+                <div class="iwrap"><input type="number" id="targetAltitude" value="3750" min="500" max="7000" step="250"><span class="iunit">m AMSL</span></div>
               </div>
             </div>
             <div class="fcell"><label for="ascentRate">Ascent rate</label>
@@ -335,6 +335,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=30"></script>
+<script src="app.js?v=34"></script>
 </body>
 </html>

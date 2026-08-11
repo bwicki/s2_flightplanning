@@ -6,7 +6,7 @@
   --violet:#b78cff; --grid-line:#2a3540;
   --mono:'SF Mono','Consolas','Menlo',monospace;
   --sans:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
-  --drawer-w:clamp(250px,27vw,620px);
+  --drawer-w:clamp(230px,20vw,620px);
 }
 body.day{
   --bg:#eef1f3; --panel:#ffffff; --panel2:#f4f6f8; --border:#d3dae0;
@@ -191,7 +191,7 @@ button.primary:active{transform:scale(0.99);}
 .preset-editor #presetMsg{white-space:normal;}
 
 /* ---- results drawer (left, with handle) ---- */
-:root{--results-w:min(440px,92vw);}
+:root{--results-w:clamp(260px,25vw,440px);}
 #resultsDrawer{position:absolute;top:0;right:0;height:100%;width:var(--results-w);background:var(--panel);border-left:1px solid var(--border);z-index:940;display:flex;flex-direction:column;transform:translateX(0);transition:transform .25s ease;box-shadow:-4px 0 18px rgba(0,0,0,.35);}
 #resultsDrawer.collapsed{transform:translateX(102%);box-shadow:none;}
 .results-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:5px;display:flex;flex-direction:column;gap:4px;scrollbar-width:none;}
@@ -305,7 +305,9 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 .as-row input{width:auto;accent-color:var(--accent);margin:0;}
 .as-swatch{width:11px;height:11px;border-radius:3px;flex-shrink:0;border:1px solid rgba(255,255,255,.35);}
 .as-note{padding:4px 14px 2px;max-width:250px;}
-.as-warn{background:rgba(224,72,63,0.14);border:1px solid var(--bad);border-radius:6px;padding:7px 9px;font-size:11px;line-height:1.45;color:var(--text);}
+.as-warn{border-radius:6px;padding:7px 9px;font-size:11px;line-height:1.45;color:var(--text);}
+.as-warn.conflict{background:rgba(224,72,63,0.14);border:1px solid var(--bad);}
+.as-warn.clear{background:rgba(63,208,107,0.12);border:1px solid var(--good);}
 .as-warn b{color:var(--bad);}
 .as-warn ul{margin:4px 0 0;padding-left:16px;}
 .as-warn li{margin:1px 0;}
@@ -315,3 +317,5 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 .tz-seg .tz-opt{border:none;background:none;color:var(--muted);font-size:8px;font-weight:600;padding:2px 8px;cursor:pointer;letter-spacing:.4px;}
 .tz-seg .tz-opt.active{background:var(--accent);color:#00201d;}
 .tz-alt{font-size:8px;color:var(--muted);font-family:var(--mono);white-space:nowrap;min-height:10px;}
+.gmaps-link{color:var(--accent);font-weight:600;text-decoration:none;}
+.gmaps-link:active{opacity:.7;}
