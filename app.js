@@ -487,7 +487,7 @@ const state = {
 // with their payload point on the coordinate; explosion & crosshair centered.
 const SIG_SVGS = {
   launch: {
-    svg: `<svg width="30" height="30" viewBox="0 0 30 30"><ellipse cx="15" cy="9" rx="7.5" ry="8.5" fill="#3fd06b" stroke="#ffffff" stroke-width="2"/><path d="M13.5 17.5 L16.5 17.5 L15.8 20 L14.2 20 Z" fill="#3fd06b" stroke="#fff" stroke-width="0.8"/><line x1="15" y1="20" x2="15" y2="25" stroke="#ffffff" stroke-width="1.6"/><rect x="12.6" y="25" width="4.8" height="4" rx="1" fill="#3fd06b" stroke="#ffffff" stroke-width="1.4"/></svg>`,
+    svg: `<svg width="30" height="30" viewBox="0 0 30 30"><ellipse cx="15" cy="9" rx="7.5" ry="8.5" fill="#4169e1" stroke="#ffffff" stroke-width="2"/><path d="M13.5 17.5 L16.5 17.5 L15.8 20 L14.2 20 Z" fill="#4169e1" stroke="#fff" stroke-width="0.8"/><line x1="15" y1="20" x2="15" y2="25" stroke="#ffffff" stroke-width="1.6"/><rect x="12.6" y="25" width="4.8" height="4" rx="1" fill="#4169e1" stroke="#ffffff" stroke-width="1.4"/></svg>`,
     size: [30, 30], anchor: [15, 29],
   },
   release: { // small explosion
@@ -527,7 +527,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.24.0 · 2026-08-10';
+const APP_VERSION = 'v1.26.0 · 2026-08-10';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -913,10 +913,30 @@ function drawTrajectory(traj) {
   if (state.landMarker) state.map.removeLayer(state.landMarker);
 
   const latlngs = traj.path.map(p => [p.lat, p.lon]);
-  // Dark casing under a bright line (cockpit flightpath idiom): stays legible
-  // over satellite imagery, terrain shading, and light basemaps alike.
+  // Dark casing under the colored line: stays legible over satellite imagery,
+  // terrain shading, and light basemaps alike.
   state.trajectoryCasing = L.polyline(latlngs, { color: '#0a0d10', weight: 8, opacity: 0.75 }).addTo(state.map);
-  state.trajectoryLine = L.polyline(latlngs, { color: '#3fd0c9', weight: 4, opacity: 1, className: 'flightpath-glow' }).addTo(state.map);
+
+  // Continuous color gradient along the path, mapped to horizontal ground
+  // speed (blue = slow ... red = fast), one short polyline per 200 m step.
+  const segSpeeds = [];
+  for (let i = 1; i < traj.path.length; i++) {
+    const a = traj.path[i - 1], b = traj.path[i];
+    const dt = b.t - a.t;
+    segSpeeds.push(dt > 0 ? haversine(a.lat, a.lon, b.lat, b.lon) / dt * 3.6 : 0);
+  }
+  const speedColor = v => {
+    const c = Math.min(Math.max(v, 0), 50) / 50;      // 0..1 over 0..50 km/h
+    return `hsl(${Math.round(215 * (1 - c))}, 82%, 55%)`; // 215° blue -> 0° red
+  };
+  const segs = [];
+  for (let i = 1; i < traj.path.length; i++) {
+    segs.push(L.polyline([latlngs[i - 1], latlngs[i]], {
+      color: speedColor(segSpeeds[i - 1]),
+      weight: 4, opacity: 1, className: 'flightpath-glow',
+    }));
+  }
+  state.trajectoryLine = L.featureGroup(segs).addTo(state.map);
 
   const releasePt = traj.path[traj.releaseIdx];
   state.releaseMarker = sigMarker(releasePt.lat, releasePt.lon, 'release').addTo(state.map)
@@ -1035,7 +1055,7 @@ function drawProfile(traj) {
     <path d="${spdArea}" fill="#3fd0c9" opacity="0.12"/>
     <path d="${spdLine}" fill="none" stroke="#3fd0c9" stroke-width="1.8"/>
     ${altSegs}
-    <circle cx="${x(0)}" cy="${yA(traj.path[0].alt)}" r="3.5" fill="#3fd06b" stroke="#fff" stroke-width="1"/>
+    <circle cx="${x(0)}" cy="${yA(traj.path[0].alt)}" r="3.5" fill="#4169e1" stroke="#fff" stroke-width="1"/>
     <circle cx="${bx}" cy="${yA(releaseP.alt)}" r="3.8" fill="#ffb454" stroke="#fff" stroke-width="1"/>
     <circle cx="${x(landP.t)}" cy="${yA(landP.alt)}" r="3.5" fill="#e0483f" stroke="#fff" stroke-width="1"/>
     <circle cx="${mx}" cy="${my}" r="2.8" fill="#3fd0c9" stroke="#fff" stroke-width="1"/>

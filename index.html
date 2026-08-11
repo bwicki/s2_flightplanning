@@ -51,7 +51,7 @@
 </script>
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=24">
+<link rel="stylesheet" href="style.css?v=26">
 </head>
 <body>
 <div id="app">
@@ -68,8 +68,14 @@
     <div class="sep"></div>
 
     <div id="modeSwitch" class="mode-toggle" role="radiogroup" aria-label="Map click mode">
-      <label><input type="radio" name="searchMode" value="forward" checked><span>⬈ Forward</span></label>
-      <label><input type="radio" name="searchMode" value="backward"><span>⬊ Backward</span></label>
+      <label><input type="radio" name="searchMode" value="forward" checked><span class="mcard">
+        <svg class="micon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/><path d="M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z"/></svg>
+        <span class="mtxt"><span class="mname">Forward</span><span class="msub">set launch</span></span>
+      </span></label>
+      <label><input type="radio" name="searchMode" value="backward"><span class="mcard">
+        <svg class="micon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>
+        <span class="mtxt"><span class="mname">Backward</span><span class="msub">set landing</span></span>
+      </span></label>
     </div>
     <div class="sep"></div>
 
@@ -94,7 +100,7 @@
     <div class="sep"></div>
 
     <div class="legend-chips">
-      <span title="Launch"><svg width="14" height="14" viewBox="0 0 30 30"><ellipse cx="15" cy="10" rx="7" ry="8" fill="#3fd06b" stroke="#fff" stroke-width="1.5"/><line x1="15" y1="18" x2="15" y2="24" stroke="#fff" stroke-width="1.5"/><rect x="12.8" y="24" width="4.4" height="3.6" rx="0.8" fill="#3fd06b" stroke="#fff" stroke-width="1"/></svg>Launch</span>
+      <span title="Launch"><svg width="14" height="14" viewBox="0 0 30 30"><ellipse cx="15" cy="10" rx="7" ry="8" fill="#4169e1" stroke="#fff" stroke-width="1.5"/><line x1="15" y1="18" x2="15" y2="24" stroke="#fff" stroke-width="1.5"/><rect x="12.8" y="24" width="4.4" height="3.6" rx="0.8" fill="#4169e1" stroke="#fff" stroke-width="1"/></svg>Launch</span>
       <span title="Burst / release"><svg width="14" height="14" viewBox="0 0 30 30"><path d="M15 2 L18 10 L26 6 L21 13 L29 15 L21 17 L26 24 L18 20 L15 28 L12 20 L4 24 L9 17 L1 15 L9 13 L4 6 L12 10 Z" fill="#ffb454" stroke="#0a0d10" stroke-width="1"/><circle cx="15" cy="15" r="3" fill="#e0483f"/></svg>Burst</span>
       <span title="Landing"><svg width="14" height="14" viewBox="0 0 30 30"><path d="M4 13 A11 9 0 0 1 26 13 L15 13 Z" fill="#e0483f" stroke="#fff" stroke-width="1.5"/><line x1="5" y1="13" x2="15" y2="25" stroke="#fff" stroke-width="1.2"/><line x1="25" y1="13" x2="15" y2="25" stroke="#fff" stroke-width="1.2"/><circle cx="15" cy="26" r="2.4" fill="#e0483f" stroke="#fff" stroke-width="1"/></svg>Landing</span>
     </div>
@@ -306,6 +312,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=24"></script>
+<script src="app.js?v=26"></script>
 </body>
 </html>
