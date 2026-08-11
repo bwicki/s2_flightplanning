@@ -151,6 +151,16 @@ function buildHourlyParams() {
   return vars.join(',');
 }
 
+// When no model is selected, pick a concrete one ourselves (highest usable
+// resolution for the location and lead time) so it can be named in the UI.
+function autoSelectModel(lat, lon, daysAhead) {
+  const inD2 = lat >= 43.2 && lat <= 58 && lon >= -3.9 && lon <= 20.3;
+  const inEU = lat >= 29.5 && lat <= 70.5 && lon >= -23.5 && lon <= 62.5;
+  if (daysAhead <= 1.8 && inD2) return 'icon_d2';
+  if (daysAhead <= 4.8 && inEU) return 'icon_eu';
+  return 'ecmwf_ifs025';
+}
+
 async function fetchWeather(lat, lon, dateUTC, timeUTC, modelSlug) {
   const requested = new Date(`${dateUTC}T${timeUTC}:00Z`);
   const now = new Date();
@@ -158,6 +168,12 @@ async function fetchWeather(lat, lon, dateUTC, timeUTC, modelSlug) {
 
   const hourlyParams = buildHourlyParams();
   let url, isArchive = false;
+  let modelAuto = false;
+  const archiveReq = daysFromNow < -5 || daysFromNow > 15;
+  if (!modelSlug && !archiveReq) {
+    modelSlug = autoSelectModel(lat, lon, Math.max(0, daysFromNow));
+    modelAuto = true;
+  }
   const modelParam = modelSlug ? `&models=${modelSlug}` : '';
 
   if (daysFromNow < -5 || daysFromNow > 15) {
@@ -173,9 +189,11 @@ async function fetchWeather(lat, lon, dateUTC, timeUTC, modelSlug) {
   }
 
   let res = await fetch(url);
+  let fellBack = false;
   if (!res.ok && modelSlug) {
     res = await fetch(url.replace(modelParam, ''));
     modelSlug = null;
+    fellBack = true;
   }
   if (!res.ok) throw new Error(`Weather request failed (${res.status})`);
   const data = await res.json();
@@ -223,7 +241,9 @@ async function fetchWeather(lat, lon, dateUTC, timeUTC, modelSlug) {
   return {
     elevation, surfacePressurePa, surfaceTempK, levels, tempLevels,
     matchedTime: data.hourly.time[idx],
-    modelUsed: modelSlug || 'best_match (automatic)',
+    modelUsed: modelSlug || (isArchive ? 'era5' : 'best_match'),
+    modelAuto,
+    modelFellBack: fellBack,
     isArchive,
   };
 }
@@ -507,7 +527,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.20.0 · 2026-08-10';
+const APP_VERSION = 'v1.23.0 · 2026-08-10';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -811,9 +831,12 @@ async function runCalculation() {
     drawProfile(r.traj);
     openResults();
     setTimeout(fitFlightPath, 320);
-    updateWxChip(r.weather.modelUsed);
-    const wxSub = $('wxModelSub');
-    if (wxSub && wxSub.textContent === 'tap to change') wxSub.textContent = `wx ${r.weather.matchedTime} UTC`;
+    updateWxChip(r.weather.modelUsed, {
+      auto: r.weather.modelAuto,
+      fellBack: r.weather.modelFellBack,
+      requested: $('weatherModel').value,
+      time: r.weather.matchedTime,
+    });
     setStatus(r.note ? 'Note — see form' : 'Calculation complete', `wx: ${r.weather.matchedTime} UTC`);
   } finally {
     state.busy = false;
@@ -1166,23 +1189,27 @@ function on(id, event, handler) {
 // Reflect the effective weather model in the header chip.
 // selectedValue = value of the hidden select; usedSlug (optional) = what the
 // calculation actually used (differs from selection after a fallback).
-function updateWxChip(usedSlug) {
+function updateWxChip(usedSlug, opts) {
   const nameEl = $('wxModelName');
   const subEl = $('wxModelSub');
   if (!nameEl) return;
   const models = window.__wxModels || [];
   const sel = $('weatherModel') ? $('weatherModel').value : '';
   const labelFor = v => {
+    if (v === 'era5') return 'ERA5 reanalysis';
+    if (!v || v.startsWith('best_match')) return 'Best match (auto)';
     const m = models.find(mm => !mm.group && mm.v === v);
     return m ? m.label : v;
   };
+  opts = opts || {};
   if (usedSlug !== undefined && usedSlug !== null) {
-    const usedVal = usedSlug.startsWith('best_match') ? '' : usedSlug;
-    if (usedVal !== sel) {
-      nameEl.textContent = labelFor(usedVal) + '';
-      if (subEl) subEl.textContent = 'fallback — ' + (sel ? labelFor(sel) : 'auto') + ' unavailable';
-      return;
+    nameEl.textContent = labelFor(usedSlug);
+    if (subEl) {
+      if (opts.fellBack) subEl.textContent = 'fallback — ' + labelFor(opts.requested || sel) + ' unavailable';
+      else if (opts.auto) subEl.textContent = 'auto-selected' + (opts.time ? ' · wx ' + opts.time + ' UTC' : '');
+      else subEl.textContent = opts.time ? 'wx ' + opts.time + ' UTC' : 'tap to change';
     }
+    return;
   }
   nameEl.textContent = sel ? labelFor(sel) : 'Best match (auto)';
   if (subEl) subEl.textContent = 'tap to change';
@@ -1247,15 +1274,19 @@ function wireUI() {
   const mainMenu = () => $('mainMenu');
   on('menuBtn', 'click', (e) => {
     const m = mainMenu();
-    if (m) m.classList.toggle('open');
+    if (m) {
+      const show = m.hidden;
+      m.hidden = !show;
+      m.classList.toggle('open', show);
+    }
     e.stopPropagation();
   });
   document.addEventListener('click', (e) => {
     const m = mainMenu();
-    if (m && m.classList.contains('open') && !m.contains(e.target) && !e.target.closest('#menuBtn')) m.classList.remove('open');
+    if (m && !m.hidden && !m.contains(e.target) && !e.target.closest('#menuBtn')) { m.hidden = true; m.classList.remove('open'); }
   });
-  on('menuParamsBtn', 'click', () => { toggleDrawer(); const m = mainMenu(); if (m) m.classList.remove('open'); });
-  on('menuResultsBtn', 'click', () => { toggleResults(); const m = mainMenu(); if (m) m.classList.remove('open'); });
+  on('menuParamsBtn', 'click', () => { toggleDrawer(); const m = mainMenu(); if (m) { m.hidden = true; m.classList.remove('open'); } });
+  on('menuResultsBtn', 'click', () => { toggleResults(); const m = mainMenu(); if (m) { m.hidden = true; m.classList.remove('open'); } });
   on('menuCloseBtn', 'click', () => toggleDrawer(false));
   on('drawerHandle', 'click', () => toggleDrawer());
   // Open the parameters drawer on first load so the user sees the settings once.

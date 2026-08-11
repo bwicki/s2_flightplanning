@@ -51,7 +51,7 @@
 </script>
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=20">
+<link rel="stylesheet" href="style.css?v=23">
 </head>
 <body>
 <div id="app">
@@ -59,8 +59,8 @@
   <!-- ================= TOPBAR ================= -->
   <div id="topbar">
     <button type="button" id="menuBtn" class="iconbtn" title="Menu" aria-label="Open menu">☰</button>
-    <div id="mainMenu" class="top-popover">
-      <button type="button" id="menuParamsBtn"><span><span class="mbadge green">1</span> Parameters</span></button>
+    <div id="mainMenu" class="top-popover" hidden>
+      <button type="button" id="menuParamsBtn"><span><span class="mbadge green">1</span> Flight settings</span></button>
       <button type="button" id="menuResultsBtn"><span><span class="mbadge amber">2</span> Resulting flight data</span></button>
       <button type="button" id="themeToggle"><span>◐ Day / night</span></button>
     </div>
@@ -149,7 +149,7 @@
       </div>
     </div>
 
-    <div id="drawerHandle" class="side-handle handle-params" title="Show / hide parameters"><span class="hbadge">1</span><span class="hlbl">Parameters</span></div>
+    <div id="drawerHandle" class="side-handle handle-params" title="Show / hide flight settings"><span class="hbadge">1</span><span class="hlbl">Flight settings</span></div>
 
     <!-- ============ SETTINGS DRAWER (right) ============ -->
     <div id="menuDrawer">
@@ -297,6 +297,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=20"></script>
+<script src="app.js?v=23"></script>
 </body>
 </html>

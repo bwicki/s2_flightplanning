@@ -194,13 +194,13 @@ button.primary:active{transform:scale(0.99);}
 .wx-group{font-size:9.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);padding:8px 14px 3px;border-bottom:1px solid var(--border);background:var(--panel);position:sticky;top:0;}
 
 /* ---- labeled side handles ---- */
-.side-handle{position:absolute;top:96px;z-index:960;width:30px;min-height:150px;padding:10px 0;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,.3);transition:left .25s ease,right .25s ease;}
-.side-handle .hbadge{width:19px;height:19px;border-radius:50%;background:#fff;color:#16202a;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.side-handle .hlbl{writing-mode:vertical-rl;text-orientation:mixed;font-size:11px;font-weight:700;letter-spacing:.6px;white-space:nowrap;}
+.side-handle{position:absolute;top:84px;z-index:960;width:42px;min-height:300px;padding:16px 0;display:flex;flex-direction:column;align-items:center;gap:12px;cursor:pointer;user-select:none;box-shadow:0 2px 10px rgba(0,0,0,.35);transition:left .25s ease,right .25s ease;}
+.side-handle .hbadge{width:26px;height:26px;border-radius:50%;background:#fff;color:#16202a;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.side-handle .hlbl{writing-mode:vertical-rl;text-orientation:mixed;font-size:14px;font-weight:700;letter-spacing:.8px;white-space:nowrap;}
 .side-handle:active{filter:brightness(1.12);}
-#drawerHandle{left:var(--drawer-w);border-radius:0 9px 9px 0;background:#1c8a49;color:#fff;border:1px solid rgba(255,255,255,0.25);border-left:none;}
+#drawerHandle{left:var(--drawer-w);border-radius:0 11px 11px 0;background:#1c8a49;color:#fff;border:1px solid rgba(255,255,255,0.25);border-left:none;}
 #drawerHandle.closed{left:0;}
-#resultsHandle{right:var(--results-w);border-radius:9px 0 0 9px;background:#c97a12;color:#fff;border:1px solid rgba(255,255,255,0.25);border-right:none;transform:none;}
+#resultsHandle{right:var(--results-w);border-radius:11px 0 0 11px;background:#c97a12;color:#fff;border:1px solid rgba(255,255,255,0.25);border-right:none;transform:none;}
 #resultsHandle .hlbl{writing-mode:vertical-rl;}
 #resultsHandle.closed{right:0;}
 
@@ -228,3 +228,19 @@ button.primary:active{transform:scale(0.99);}
 .datacell .val .unit{font-size:11px;font-weight:600;color:var(--muted);margin-left:3px;letter-spacing:.3px;}
 .datacell .val.small{font-size:11px;font-weight:500;}
 #resultsDrawer .datagrid{gap:3px 4px;}
+
+/* ---- hamburger dropdown ---- */
+.top-popover{display:none;position:fixed;top:52px;left:8px;background:var(--panel2);border:1px solid var(--border);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.4);padding:6px 0;z-index:5000;flex-direction:column;min-width:220px;overflow:hidden;}
+.top-popover.open{display:flex;}
+.top-popover button{background:none;border:none;border-bottom:1px solid var(--border);color:var(--text);text-align:left;padding:11px 14px;font-size:12.5px;cursor:pointer;}
+.top-popover button:last-child{border-bottom:none;}
+.top-popover button:active{background:var(--panel);}
+.mbadge{display:inline-flex;width:17px;height:17px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;align-items:center;justify-content:center;margin-right:6px;vertical-align:middle;}
+.mbadge.green{background:#1c8a49;}
+.mbadge.amber{background:#c97a12;}
+
+/* status chip now sits left of the spacer: left-aligned */
+.wx-chip.status{text-align:left;align-items:flex-start;max-width:40ch;}
+
+[hidden]{display:none !important;}
+.top-popover[hidden]{display:none !important;}
