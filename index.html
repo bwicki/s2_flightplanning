@@ -51,7 +51,7 @@
 </script>
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=41">
+<link rel="stylesheet" href="style.css?v=43">
 </head>
 <body>
 <div id="app">
@@ -131,9 +131,11 @@
     <div id="mapwrap">
       <div id="map"></div>
       <div id="speedLegendBar" class="legend-bar">
-      <span class="gwl-title">Ground speed:</span>
-      <span class="gwl-grad"></span>
-      <span class="gwl-ticks"><span>0</span><span>25</span><span>50+ km/h</span></span>
+      <span class="gwl-title">Ground speed · km/h</span>
+      <span class="gwl-col">
+        <span class="gwl-grad"></span>
+        <span class="gwl-ticks"><span id="gwlMin">0</span><span id="gwlMid">25</span><span id="gwlMax">50</span></span>
+      </span>
     </div>
     <div id="versionChip" class="version-badge"></div>
     </div>
@@ -347,6 +349,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=41"></script>
+<script src="app.js?v=43"></script>
 </body>
 </html>

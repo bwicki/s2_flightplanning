@@ -489,6 +489,7 @@ const state = {
   trajectoryCasing: null,
   airspaceLayer: null,
   trajectoryGradient: null,
+  profileViolations: [],
   airspacePolys: [],
   lastResult: null,
   busy: false,
@@ -538,7 +539,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.41.0 · 2026-08-11';
+const APP_VERSION = 'v1.43.0 · 2026-08-11';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -984,6 +985,7 @@ const GradientPathLayer = L.Layer.extend({
 });
 
 function drawTrajectory(traj) {
+  state.profileViolations = [];
   if (state.trajectoryCasing) { state.map.removeLayer(state.trajectoryCasing); state.trajectoryCasing = null; }
   if (state.trajectoryGradient) { state.map.removeLayer(state.trajectoryGradient); state.trajectoryGradient = null; }
   const slb0 = $('speedLegendBar');
@@ -1016,14 +1018,27 @@ function drawTrajectory(traj) {
     const b = segSpeeds[Math.min(segSpeeds.length - 1, i)] ?? a;
     vSpd[i] = (a + b) / 2;
   }
-  const hueOf = v => 215 * (1 - Math.min(Math.max(v, 0), 50) / 50);
+  // Scale stretched to the speeds actually occurring in this trajectory
+  // (guarded to a minimum 5 km/h span so noise does not explode the colors).
+  let minV = Math.min(...vSpd), maxV = Math.max(...vSpd);
+  if (!isFinite(minV)) { minV = 0; maxV = 1; }
+  minV = Math.floor(minV);
+  maxV = Math.ceil(maxV);
+  if (maxV - minV < 5) maxV = minV + 5;
+  const hueOf = v => 215 * (1 - Math.min(Math.max((v - minV) / (maxV - minV), 0), 1));
   const vColors = vSpd.map(v => `hsl(${(hueOf(v)).toFixed(1)}, 82%, 55%)`);
 
   state.trajectoryGradient = new GradientPathLayer(latlngs, vColors).addTo(state.map);
   // Invisible polyline keeps bounds/fitting and the "trajectory exists" checks working.
   state.trajectoryLine = L.polyline(latlngs, { opacity: 0, weight: 1, interactive: false }).addTo(state.map);
   const slb = $('speedLegendBar');
-  if (slb) slb.classList.add('show');
+  if (slb) {
+    slb.classList.add('show');
+    const mid = Math.round((minV + maxV) / 2);
+    if ($('gwlMin')) $('gwlMin').textContent = String(minV);
+    if ($('gwlMid')) $('gwlMid').textContent = String(mid);
+    if ($('gwlMax')) $('gwlMax').textContent = String(maxV);
+  }
 
   const releasePt = traj.path[traj.releaseIdx];
   state.releaseMarker = sigMarker(releasePt.lat, releasePt.lon, 'release').addTo(state.map)
@@ -1136,8 +1151,23 @@ function drawProfile(traj) {
     <text x="${W - padR}" y="${legY + 6}" text-anchor="end" fill="var(--text-dim)" font-size="8" font-family="IBM Plex Mono">max ${Math.round(maxS)} km/h</text>
   `;
 
+  // P4: red conflict boxes — time window x altitude band of each violated airspace
+  let violBoxes = '';
+  (state.profileViolations || []).forEach(v => {
+    const x1 = Math.max(padL, x(v.tMin)), x2 = Math.min(W - padR, x(v.tMax));
+    const y1 = Math.max(p1T, yA(Math.min(v.maxAlt, maxA)));
+    const y2 = Math.min(p1B, yA(Math.max(v.minAlt, minA)));
+    const w = Math.max(x2 - x1, 3), h = Math.max(y2 - y1, 3);
+    violBoxes += `<rect x="${x1}" y="${y1}" width="${w}" height="${h}" fill="#e0483f" opacity="0.18" stroke="#e0483f" stroke-width="1"/>`;
+    if (w > 34) {
+      const nm = String(v.it.name || '').slice(0, 14);
+      violBoxes += `<text x="${x1 + 3}" y="${Math.max(y1 + 9, p1T + 9)}" fill="#e0483f" font-size="7.5" font-family="IBM Plex Mono">${nm} \u2717</text>`;
+    }
+  });
+
   svg.innerHTML = `
     ${grid}
+    ${violBoxes}
     <rect x="${padL}" y="${p1T}" width="${plotW}" height="${p1H}" fill="none" stroke="var(--grid-line)" stroke-width="1"/>
     <rect x="${padL}" y="${p2T}" width="${plotW}" height="${p2H}" fill="none" stroke="var(--grid-line)" stroke-width="1"/>
     <line x1="${bx}" y1="${p1T}" x2="${bx}" y2="${p2B}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3" opacity="0.8"/>
@@ -1514,12 +1544,15 @@ async function checkAirspaceViolations(traj) {
       if (hi !== null && p.alt > hi) continue;
       if (geomContains(p.lat, p.lon, it.geometry)) {
         const k = (it.name || '?') + '|' + it.type;
-        if (!hits.has(k)) hits.set(k, { it, cat, minAlt: p.alt, maxAlt: p.alt });
+        if (!hits.has(k)) hits.set(k, { it, cat, minAlt: p.alt, maxAlt: p.alt, tMin: p.t, tMax: p.t });
         const h = hits.get(k);
         h.minAlt = Math.min(h.minAlt, p.alt); h.maxAlt = Math.max(h.maxAlt, p.alt);
+        h.tMin = Math.min(h.tMin, p.t); h.tMax = Math.max(h.tMax, p.t);
       }
     }
   });
+  state.profileViolations = [...hits.values()];
+  drawProfile(traj);
   if (hits.size === 0) {
     warnEl.hidden = false;
     warnEl.classList.remove('conflict');
