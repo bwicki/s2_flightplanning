@@ -309,3 +309,9 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 .as-warn b{color:var(--bad);}
 .as-warn ul{margin:4px 0 0;padding-left:16px;}
 .as-warn li{margin:1px 0;}
+
+/* S4d time zone segment + conversion line */
+.tz-seg{display:flex;border:1px solid var(--border);border-radius:999px;overflow:hidden;}
+.tz-seg .tz-opt{border:none;background:none;color:var(--muted);font-size:8px;font-weight:600;padding:2px 8px;cursor:pointer;letter-spacing:.4px;}
+.tz-seg .tz-opt.active{background:var(--accent);color:#00201d;}
+.tz-alt{font-size:8px;color:var(--muted);font-family:var(--mono);white-space:nowrap;min-height:10px;}

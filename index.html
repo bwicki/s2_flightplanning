@@ -51,7 +51,7 @@
 </script>
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=28">
+<link rel="stylesheet" href="style.css?v=30">
 </head>
 <body>
 <div id="app">
@@ -166,11 +166,15 @@
     <div id="drawerHandle" class="side-handle handle-params" title="Show / hide flight settings"><span class="hbadge">1</span><span class="hlbl">Flight settings</span></div>
 
     <div id="quickControls">
-      <div id="launchTimeBox" title="Launch date and time (UTC)">
+      <div id="launchTimeBox" title="Launch date and time">
         <span class="rs-lbl">Launch</span>
-        <span class="rs-unit">UTC</span>
+        <div class="tz-seg" id="tzSeg" role="radiogroup" aria-label="Time zone">
+          <button type="button" class="tz-opt active" data-tz="utc">UTC</button>
+          <button type="button" class="tz-opt" data-tz="lt">LT</button>
+        </div>
         <input type="date" id="qLaunchDate">
         <input type="time" id="qLaunchTime" step="60">
+        <span class="tz-alt" id="tzAlt"></span>
         <button type="button" id="qNowBtn" class="ghost">now</button>
       </div>
       <div id="releaseSliderBox" title="Release altitude">
@@ -331,6 +335,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=28"></script>
+<script src="app.js?v=30"></script>
 </body>
 </html>

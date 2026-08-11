@@ -480,6 +480,7 @@ const state = {
   trajectoryLine: null,
   trajectoryCasing: null,
   airspaceLayer: null,
+  trajectoryGradient: null,
   airspacePolys: [],
   lastResult: null,
   busy: false,
@@ -529,7 +530,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.28.0 · 2026-08-10';
+const APP_VERSION = 'v1.30.0 · 2026-08-10';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -909,16 +910,71 @@ function fitFlightPath() {
   });
 }
 
+
+// Canvas overlay stroking the flight path with genuine per-segment linear
+// gradients (dark casing pass first, then the colored pass).
+const GradientPathLayer = L.Layer.extend({
+  initialize: function (latlngs, colors) { this._lls = latlngs; this._cols = colors; },
+  onAdd: function (map) {
+    this._map = map;
+    this._canvas = L.DomUtil.create('canvas', 'flightpath-canvas leaflet-zoom-hide');
+    this._canvas.style.pointerEvents = 'none';
+    map.getPanes().overlayPane.appendChild(this._canvas);
+    this._redraw = this._draw.bind(this);
+    map.on('move zoomend viewreset resize', this._redraw);
+    this._draw();
+    return this;
+  },
+  onRemove: function (map) {
+    map.off('move zoomend viewreset resize', this._redraw);
+    if (this._canvas && this._canvas.parentNode) this._canvas.parentNode.removeChild(this._canvas);
+  },
+  _draw: function () {
+    const map = this._map;
+    const size = map.getSize();
+    const dpr = window.devicePixelRatio || 1;
+    this._canvas.width = size.x * dpr;
+    this._canvas.height = size.y * dpr;
+    this._canvas.style.width = size.x + 'px';
+    this._canvas.style.height = size.y + 'px';
+    L.DomUtil.setPosition(this._canvas, map.containerPointToLayerPoint([0, 0]));
+    const ctx = this._canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size.x, size.y);
+    const pts = this._lls.map(ll => map.latLngToContainerPoint(ll));
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // casing pass
+    ctx.beginPath();
+    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.strokeStyle = 'rgba(10,13,16,0.75)';
+    ctx.lineWidth = 8;
+    ctx.stroke();
+    // gradient pass, one linear gradient per segment
+    ctx.lineWidth = 4;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      if (Math.abs(a.x - b.x) < 0.1 && Math.abs(a.y - b.y) < 0.1) continue;
+      const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+      g.addColorStop(0, this._cols[i - 1]);
+      g.addColorStop(1, this._cols[i]);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.strokeStyle = g;
+      ctx.stroke();
+    }
+  },
+});
+
 function drawTrajectory(traj) {
-  if (state.trajectoryCasing) state.map.removeLayer(state.trajectoryCasing);
+  if (state.trajectoryCasing) { state.map.removeLayer(state.trajectoryCasing); state.trajectoryCasing = null; }
+  if (state.trajectoryGradient) { state.map.removeLayer(state.trajectoryGradient); state.trajectoryGradient = null; }
   if (state.trajectoryLine) state.map.removeLayer(state.trajectoryLine);
   if (state.releaseMarker) state.map.removeLayer(state.releaseMarker);
   if (state.landMarker) state.map.removeLayer(state.landMarker);
 
   const latlngs = traj.path.map(p => [p.lat, p.lon]);
-  // Dark casing under the colored line: stays legible over satellite imagery,
-  // terrain shading, and light basemaps alike.
-  state.trajectoryCasing = L.polyline(latlngs, { color: '#0a0d10', weight: 8, opacity: 0.75 }).addTo(state.map);
 
   // Continuous color gradient along the path, mapped to horizontal ground
   // speed (blue = slow ... red = fast), one short polyline per 200 m step.
@@ -932,9 +988,9 @@ function drawTrajectory(traj) {
     const c = Math.min(Math.max(v, 0), 50) / 50;      // 0..1 over 0..50 km/h
     return `hsl(${Math.round(215 * (1 - c))}, 82%, 55%)`; // 215° blue -> 0° red
   };
-  // Per-vertex speeds (average of adjacent segments), then each 200 m segment
-  // is subdivided with hue-interpolated colors so the gradient runs smoothly
-  // along the path without visible banding.
+  // Per-vertex speeds (average of adjacent segments); the canvas layer below
+  // strokes every segment with a true linear color gradient between its two
+  // endpoint colors, so the hue runs continuously along the whole path.
   const n = traj.path.length;
   const vSpd = new Array(n);
   for (let i = 0; i < n; i++) {
@@ -943,23 +999,11 @@ function drawTrajectory(traj) {
     vSpd[i] = (a + b) / 2;
   }
   const hueOf = v => 215 * (1 - Math.min(Math.max(v, 0), 50) / 50);
-  const SUB = 5;
-  const segs = [];
-  for (let i = 1; i < n; i++) {
-    const [la1, lo1] = latlngs[i - 1], [la2, lo2] = latlngs[i];
-    const h1 = hueOf(vSpd[i - 1]), h2 = hueOf(vSpd[i]);
-    for (let k = 0; k < SUB; k++) {
-      const t1 = k / SUB, t2 = (k + 1) / SUB, tm = (t1 + t2) / 2;
-      segs.push(L.polyline([
-        [la1 + (la2 - la1) * t1, lo1 + (lo2 - lo1) * t1],
-        [la1 + (la2 - la1) * t2, lo1 + (lo2 - lo1) * t2],
-      ], {
-        color: `hsl(${Math.round(h1 + (h2 - h1) * tm)}, 82%, 55%)`,
-        weight: 4, opacity: 1, lineCap: 'round', className: 'flightpath-glow',
-      }));
-    }
-  }
-  state.trajectoryLine = L.featureGroup(segs).addTo(state.map);
+  const vColors = vSpd.map(v => `hsl(${(hueOf(v)).toFixed(1)}, 82%, 55%)`);
+
+  state.trajectoryGradient = new GradientPathLayer(latlngs, vColors).addTo(state.map);
+  // Invisible polyline keeps bounds/fitting and the "trajectory exists" checks working.
+  state.trajectoryLine = L.polyline(latlngs, { opacity: 0, weight: 1, interactive: false }).addTo(state.map);
 
   const releasePt = traj.path[traj.releaseIdx];
   state.releaseMarker = sigMarker(releasePt.lat, releasePt.lon, 'release').addTo(state.map)
@@ -1332,9 +1376,24 @@ async function fetchAirspaces(bbox) {
   const bkey = bbox.map(v => v.toFixed(2)).join(',');
   if (asCache.has(bkey)) return asCache.get(bkey);
   const url = `https://api.core.openaip.net/api/airspaces?apiKey=${encodeURIComponent(key)}&bbox=${bbox.join(',')}&limit=1000`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Airspace request failed (${res.status})`);
-  const data = await res.json();
+  // The OpenAIP core API sends no CORS headers, so a direct browser fetch is
+  // blocked. Try direct first (in case that changes), then public CORS relays.
+  const candidates = [
+    url,
+    `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  ];
+  let data = null, lastErr = null;
+  for (const u of candidates) {
+    try {
+      const res = await fetch(u);
+      if (!res.ok) { lastErr = new Error(`Airspace request failed (${res.status})`); continue; }
+      data = await res.json();
+      if (data && data.items) break;
+      data = null;
+    } catch (e) { lastErr = e; }
+  }
+  if (!data) throw (lastErr || new Error('Airspace request failed'));
   const items = data.items || [];
   asCache.set(bkey, items);
   if (asCache.size > 24) asCache.delete(asCache.keys().next().value);
@@ -1572,17 +1631,66 @@ function wireUI() {
   }
   on('targetAltitude', 'change', () => { syncSliderFromInput(); dismissReleaseHint(); });
 
-  // Compact launch-time box next to the release slider (two-way synced, UTC)
+  // Compact launch-time box (S4d): fields edit in UTC or device local time,
+  // the small line below always shows the conversion into the other zone.
+  // Internally everything stays UTC (weather API, main card 04).
+  let qTz = 'utc';
+  try { qTz = localStorage.getItem('sfp_tz') || 'utc'; } catch (e) { /* ignore */ }
+
+  const mainUtcDate = () => {
+    const d = $('launchDate').value, t = $('launchTime').value;
+    return (d && t) ? new Date(`${d}T${t}:00Z`) : null;
+  };
+  const pad2 = x => String(x).padStart(2, '0');
+  const localParts = dt => ({
+    date: `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`,
+    time: `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`,
+  });
+  const utcParts = dt => ({ date: dt.toISOString().slice(0, 10), time: dt.toISOString().slice(11, 16) });
+
+  const renderTzSeg = () => {
+    document.querySelectorAll('#tzSeg .tz-opt').forEach(b => b.classList.toggle('active', b.dataset.tz === qTz));
+  };
   const syncQuickTimeFromMain = () => {
-    if ($('qLaunchDate')) $('qLaunchDate').value = $('launchDate').value;
-    if ($('qLaunchTime')) $('qLaunchTime').value = $('launchTime').value;
+    const dt = mainUtcDate();
+    if (!dt) return;
+    const p = qTz === 'lt' ? localParts(dt) : utcParts(dt);
+    if ($('qLaunchDate')) $('qLaunchDate').value = p.date;
+    if ($('qLaunchTime')) $('qLaunchTime').value = p.time;
+    const alt = $('tzAlt');
+    if (alt) {
+      const o = qTz === 'lt' ? utcParts(dt) : localParts(dt);
+      alt.textContent = `= ${o.time} ${qTz === 'lt' ? 'UTC' : 'LT'}`;
+    }
   };
   const applyQuickTime = () => {
-    if ($('qLaunchDate') && $('qLaunchDate').value) $('launchDate').value = $('qLaunchDate').value;
-    if ($('qLaunchTime') && $('qLaunchTime').value) $('launchTime').value = $('qLaunchTime').value;
+    const d = $('qLaunchDate') && $('qLaunchDate').value;
+    const t = $('qLaunchTime') && $('qLaunchTime').value;
+    if (!d || !t) return;
+    let dt;
+    if (qTz === 'lt') {
+      const [y, m, dd] = d.split('-').map(Number);
+      const [hh, mm] = t.split(':').map(Number);
+      dt = new Date(y, m - 1, dd, hh, mm, 0);      // local wall clock -> Date
+    } else {
+      dt = new Date(`${d}T${t}:00Z`);
+    }
+    const u = utcParts(dt);
+    $('launchDate').value = u.date;
+    $('launchTime').value = u.time;
+    syncQuickTimeFromMain();
     recalcExistingTrajectory();
   };
+  renderTzSeg();
   syncQuickTimeFromMain();
+  document.querySelectorAll('#tzSeg .tz-opt').forEach(b => {
+    b.addEventListener('click', () => {
+      qTz = b.dataset.tz;
+      try { localStorage.setItem('sfp_tz', qTz); } catch (e) { /* ignore */ }
+      renderTzSeg();
+      syncQuickTimeFromMain();   // same instant, re-displayed in the new zone
+    });
+  });
   on('qLaunchDate', 'change', applyQuickTime);
   on('qLaunchTime', 'change', applyQuickTime);
   on('launchDate', 'change', syncQuickTimeFromMain);
