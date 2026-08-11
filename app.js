@@ -479,6 +479,8 @@ const state = {
   deviceMarker: null,
   trajectoryLine: null,
   trajectoryCasing: null,
+  airspaceLayer: null,
+  airspacePolys: [],
   lastResult: null,
   busy: false,
 };
@@ -527,7 +529,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.26.0 · 2026-08-10';
+const APP_VERSION = 'v1.28.0 · 2026-08-10';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -820,7 +822,7 @@ async function runCalculation() {
   if (drawer) drawer.classList.add('collapsed');
   const dh = $('drawerHandle');
   if (dh) dh.classList.add('closed');
-  const rb0 = $('releaseSliderBox');
+  const rb0 = $('quickControls');
   if (rb0) rb0.classList.add('closed');
   setStatus('Fetching weather…', 'wind + pressure levels');
   try {
@@ -833,6 +835,7 @@ async function runCalculation() {
     drawProfile(r.traj);
     openResults();
     setTimeout(fitFlightPath, 320);
+    checkAirspaceViolations(r.traj).catch(() => {});
     updateWxChip(r.weather.modelUsed, {
       auto: r.weather.modelAuto,
       fellBack: r.weather.modelFellBack,
@@ -929,12 +932,32 @@ function drawTrajectory(traj) {
     const c = Math.min(Math.max(v, 0), 50) / 50;      // 0..1 over 0..50 km/h
     return `hsl(${Math.round(215 * (1 - c))}, 82%, 55%)`; // 215° blue -> 0° red
   };
+  // Per-vertex speeds (average of adjacent segments), then each 200 m segment
+  // is subdivided with hue-interpolated colors so the gradient runs smoothly
+  // along the path without visible banding.
+  const n = traj.path.length;
+  const vSpd = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const a = segSpeeds[Math.max(0, i - 1)] ?? 0;
+    const b = segSpeeds[Math.min(segSpeeds.length - 1, i)] ?? a;
+    vSpd[i] = (a + b) / 2;
+  }
+  const hueOf = v => 215 * (1 - Math.min(Math.max(v, 0), 50) / 50);
+  const SUB = 5;
   const segs = [];
-  for (let i = 1; i < traj.path.length; i++) {
-    segs.push(L.polyline([latlngs[i - 1], latlngs[i]], {
-      color: speedColor(segSpeeds[i - 1]),
-      weight: 4, opacity: 1, className: 'flightpath-glow',
-    }));
+  for (let i = 1; i < n; i++) {
+    const [la1, lo1] = latlngs[i - 1], [la2, lo2] = latlngs[i];
+    const h1 = hueOf(vSpd[i - 1]), h2 = hueOf(vSpd[i]);
+    for (let k = 0; k < SUB; k++) {
+      const t1 = k / SUB, t2 = (k + 1) / SUB, tm = (t1 + t2) / 2;
+      segs.push(L.polyline([
+        [la1 + (la2 - la1) * t1, lo1 + (lo2 - lo1) * t1],
+        [la1 + (la2 - la1) * t2, lo1 + (lo2 - lo1) * t2],
+      ], {
+        color: `hsl(${Math.round(h1 + (h2 - h1) * tm)}, 82%, 55%)`,
+        weight: 4, opacity: 1, lineCap: 'round', className: 'flightpath-glow',
+      }));
+    }
   }
   state.trajectoryLine = L.featureGroup(segs).addTo(state.map);
 
@@ -1111,6 +1134,7 @@ async function reverseCalcFromLanding(targetLat, targetLon) {
     drawProfile(result.traj);
     openResults();
     setTimeout(fitFlightPath, 320);
+    checkAirspaceViolations(result.traj).catch(() => {});
 
     const finalErr = haversine(targetLat, targetLon, result.traj.landing.lat, result.traj.landing.lon);
     setStatus('Launch site back-solved', `landing ${(finalErr / 1000).toFixed(1)} km from target`);
@@ -1250,6 +1274,196 @@ function recalcExistingTrajectory() {
   }
 }
 
+
+// =========================================================================
+// Airspace overlay & violation check (OpenAIP core API, approximate)
+// =========================================================================
+const OPENAIP_DEFAULT_KEY = 'e9946fdef0b38f6540986cb7045f893a';
+const AS_CATS = [
+  { id: 'ctr',    label: 'CTR',              types: [4],      color: '#2f7fd0', def: true },
+  { id: 'p',      label: 'Prohibited (P)',   types: [3],      color: '#e0483f', def: true },
+  { id: 'r',      label: 'Restricted (R)',   types: [1],      color: '#e07a3f', def: false },
+  { id: 'd',      label: 'Danger (D)',       types: [2],      color: '#e0b400', def: false },
+  { id: 'tma',    label: 'TMA / CTA',        types: [7, 26],  color: '#7a9bd0', def: false },
+  { id: 'tmz',    label: 'TMZ / RMZ',        types: [5, 6],   color: '#8cd0c9', def: false },
+  { id: 'atz',    label: 'ATZ',              types: [13],     color: '#b78cff', def: false },
+  { id: 'glider', label: 'Gliding sectors',  types: [21],     color: '#3fd06b', def: false },
+];
+
+function asPrefs() {
+  try {
+    const p = JSON.parse(localStorage.getItem('sfp_airspace') || '{}');
+    if (!p.cats) p.cats = {};
+    AS_CATS.forEach(c => { if (p.cats[c.id] === undefined) p.cats[c.id] = c.def; });
+    return p;
+  } catch (e) { const p = { cats: {} }; AS_CATS.forEach(c => p.cats[c.id] = c.def); return p; }
+}
+function saveAsPrefs(p) { try { localStorage.setItem('sfp_airspace', JSON.stringify(p)); } catch (e) { /* ignore */ } }
+
+function enabledAsTypes() {
+  const p = asPrefs();
+  const types = new Map();
+  AS_CATS.forEach(c => { if (p.cats[c.id]) c.types.forEach(t => types.set(t, c)); });
+  return types;
+}
+
+// value/unit/referenceDatum -> metres AMSL (AGL approximated with ground elev)
+function asLimitMeters(lim, groundElev) {
+  if (!lim || lim.value === undefined) return null;
+  let m;
+  if (lim.unit === 6) m = lim.value * 100 * 0.3048;      // flight level
+  else if (lim.unit === 1) m = lim.value * 0.3048;       // feet
+  else m = lim.value;                                    // metres
+  if (lim.referenceDatum === 0) m += (groundElev || 0);  // GND / AGL approx
+  return m;
+}
+function asLimitText(lim) {
+  if (!lim || lim.value === undefined) return '?';
+  if (lim.unit === 6) return 'FL' + lim.value;
+  const u = lim.unit === 1 ? 'ft' : 'm';
+  const r = lim.referenceDatum === 0 ? ' AGL' : lim.referenceDatum === 2 ? ' STD' : ' AMSL';
+  return `${lim.value} ${u}${r}`;
+}
+
+const asCache = new Map();
+async function fetchAirspaces(bbox) {
+  const key = (asPrefs().key || OPENAIP_DEFAULT_KEY).trim();
+  if (!key) return [];
+  const bkey = bbox.map(v => v.toFixed(2)).join(',');
+  if (asCache.has(bkey)) return asCache.get(bkey);
+  const url = `https://api.core.openaip.net/api/airspaces?apiKey=${encodeURIComponent(key)}&bbox=${bbox.join(',')}&limit=1000`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Airspace request failed (${res.status})`);
+  const data = await res.json();
+  const items = data.items || [];
+  asCache.set(bkey, items);
+  if (asCache.size > 24) asCache.delete(asCache.keys().next().value);
+  return items;
+}
+
+function ringContains(lat, lon, ring) {
+  let inside = false;
+  for (let i = 0, jj = ring.length - 1; i < ring.length; jj = i++) {
+    const xi = ring[i][0], yi = ring[i][1];
+    const xj = ring[jj][0], yj = ring[jj][1];
+    if (((yi > lat) !== (yj > lat)) && (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function geomContains(lat, lon, geometry) {
+  if (!geometry) return false;
+  const polys = geometry.type === 'MultiPolygon' ? geometry.coordinates : [geometry.coordinates];
+  for (const poly of polys) {
+    if (!poly || !poly[0]) continue;
+    if (ringContains(lat, lon, poly[0])) {
+      let inHole = false;
+      for (let h = 1; h < poly.length; h++) if (ringContains(lat, lon, poly[h])) { inHole = true; break; }
+      if (!inHole) return true;
+    }
+  }
+  return false;
+}
+
+// ---- overlay rendering for the current map view ----
+async function refreshAirspaceOverlay() {
+  const types = enabledAsTypes();
+  if (state.airspaceLayer) { state.map.removeLayer(state.airspaceLayer); state.airspaceLayer = null; }
+  state.airspacePolys = [];
+  if (types.size === 0) return;
+  if (state.map.getZoom() < 7) { setStatus('Airspace overlay', 'zoom in to load airspaces'); return; }
+  const b = state.map.getBounds();
+  try {
+    const items = await fetchAirspaces([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]);
+    const layers = [];
+    items.forEach(it => {
+      const cat = types.get(it.type);
+      if (!cat || !it.geometry) return;
+      const polys = it.geometry.type === 'MultiPolygon' ? it.geometry.coordinates : [it.geometry.coordinates];
+      polys.forEach(poly => {
+        if (!poly || !poly[0]) return;
+        const latlngs = poly.map(ring => ring.map(pt => [pt[1], pt[0]]));
+        const layer = L.polygon(latlngs, { color: cat.color, weight: 1.5, opacity: 0.9, fillColor: cat.color, fillOpacity: 0.12 });
+        layer.bindPopup(`<b>${it.name || 'Airspace'}</b><br>${cat.label}${it.icaoClass !== undefined && it.icaoClass !== 8 ? ' · class ' + 'ABCDEFG'[it.icaoClass] : ''}<br>${asLimitText(it.lowerLimit)} – ${asLimitText(it.upperLimit)}`);
+        layer._asMeta = it;
+        layers.push(layer);
+      });
+      state.airspacePolys.push({ it, cat });
+    });
+    state.airspaceLayer = L.featureGroup(layers).addTo(state.map);
+    state.airspaceLayer.eachLayer(l => { if (l.bringToBack) l.bringToBack(); });
+  } catch (e) {
+    setStatus('Airspace load failed', e.message || 'check API key');
+  }
+}
+
+// ---- trajectory violation check ----
+async function checkAirspaceViolations(traj) {
+  const warnEl = $('airspaceWarn');
+  const types = enabledAsTypes();
+  if (!warnEl) return;
+  if (types.size === 0) { warnEl.hidden = true; return; }
+  const lats = traj.path.map(p => p.lat), lons = traj.path.map(p => p.lon);
+  const pad = 0.15;
+  const bbox = [Math.min(...lons) - pad, Math.min(...lats) - pad, Math.max(...lons) + pad, Math.max(...lats) + pad];
+  const groundElev = traj.path[0].alt;
+  let items;
+  try { items = await fetchAirspaces(bbox); } catch (e) { warnEl.hidden = true; return; }
+  const hits = new Map();
+  items.forEach(it => {
+    const cat = types.get(it.type);
+    if (!cat || !it.geometry) return;
+    const lo = asLimitMeters(it.lowerLimit, groundElev);
+    const hi = asLimitMeters(it.upperLimit, groundElev);
+    for (const p of traj.path) {
+      if (lo !== null && p.alt < lo) continue;
+      if (hi !== null && p.alt > hi) continue;
+      if (geomContains(p.lat, p.lon, it.geometry)) {
+        const k = (it.name || '?') + '|' + it.type;
+        if (!hits.has(k)) hits.set(k, { it, cat, minAlt: p.alt, maxAlt: p.alt });
+        const h = hits.get(k);
+        h.minAlt = Math.min(h.minAlt, p.alt); h.maxAlt = Math.max(h.maxAlt, p.alt);
+      }
+    }
+  });
+  if (hits.size === 0) {
+    warnEl.hidden = false;
+    warnEl.innerHTML = '<b style="color:var(--good);">✓ No conflict</b> with the enabled airspace categories (approximate check).';
+    return;
+  }
+  const rows = [...hits.values()].map(h =>
+    `<li><b>${h.it.name || 'Airspace'}</b> (${h.cat.label}, ${asLimitText(h.it.lowerLimit)} – ${asLimitText(h.it.upperLimit)}) — crossed at ${Math.round(h.minAlt)}–${Math.round(h.maxAlt)} m AMSL</li>`).join('');
+  warnEl.hidden = false;
+  warnEl.innerHTML = `<b>⚠ Airspace conflict</b> — trajectory enters ${hits.size} enabled airspace${hits.size > 1 ? 's' : ''}:<ul>${rows}</ul>`;
+  setStatus('⚠ Airspace conflict', [...hits.values()].map(h => h.it.name).slice(0, 2).join(', '));
+  // Highlight the offending polygons on the map
+  if (state.airspaceLayer) {
+    state.airspaceLayer.eachLayer(l => {
+      const m = l._asMeta;
+      if (m && hits.has((m.name || '?') + '|' + m.type)) l.setStyle({ weight: 3, fillOpacity: 0.28 });
+    });
+  }
+}
+
+function buildAirspaceMenu() {
+  const rows = $('airspaceRows');
+  if (!rows) return;
+  const p = asPrefs();
+  rows.innerHTML = '';
+  AS_CATS.forEach(c => {
+    const lab = document.createElement('label');
+    lab.className = 'as-row';
+    lab.innerHTML = `<input type="checkbox" ${p.cats[c.id] ? 'checked' : ''}><span class="as-swatch" style="background:${c.color};"></span><span>${c.label}</span>`;
+    lab.querySelector('input').addEventListener('change', (e) => {
+      const np = asPrefs();
+      np.cats[c.id] = e.target.checked;
+      saveAsPrefs(np);
+      refreshAirspaceOverlay();
+      if (state.lastResult) checkAirspaceViolations(state.lastResult.traj).catch(() => {});
+    });
+    rows.appendChild(lab);
+  });
+}
+
 function wireUI() {
   on('sondeType', 'change', e => {
     const w = e.target.selectedOptions[0].dataset.weight;
@@ -1304,7 +1518,7 @@ function wireUI() {
     if (open === undefined) open = d.classList.contains('collapsed');
     d.classList.toggle('collapsed', !open);
     if (h) h.classList.toggle('closed', !open);
-    const rb = $('releaseSliderBox');
+    const rb = $('quickControls');
     if (rb) rb.classList.toggle('closed', !open);
     setTimeout(() => { if (state.map) state.map.invalidateSize(); }, 280);
   };
@@ -1336,7 +1550,7 @@ function wireUI() {
   // Release-altitude slider (below the green handle), two-way synced with the input
   const relSlider = $('sReleaseAlt');
   const relLbl = $('lblReleaseAlt');
-  const setRelLbl = v => { if (relLbl) relLbl.textContent = `${Math.round(v)} m`; };
+  const setRelLbl = v => { if (relLbl) relLbl.textContent = `${Math.round(v)}`; };
   const syncSliderFromInput = () => {
     if (!relSlider) return;
     const v = parseFloat($('targetAltitude').value);
@@ -1357,6 +1571,30 @@ function wireUI() {
     });
   }
   on('targetAltitude', 'change', () => { syncSliderFromInput(); dismissReleaseHint(); });
+
+  // Compact launch-time box next to the release slider (two-way synced, UTC)
+  const syncQuickTimeFromMain = () => {
+    if ($('qLaunchDate')) $('qLaunchDate').value = $('launchDate').value;
+    if ($('qLaunchTime')) $('qLaunchTime').value = $('launchTime').value;
+  };
+  const applyQuickTime = () => {
+    if ($('qLaunchDate') && $('qLaunchDate').value) $('launchDate').value = $('qLaunchDate').value;
+    if ($('qLaunchTime') && $('qLaunchTime').value) $('launchTime').value = $('qLaunchTime').value;
+    recalcExistingTrajectory();
+  };
+  syncQuickTimeFromMain();
+  on('qLaunchDate', 'change', applyQuickTime);
+  on('qLaunchTime', 'change', applyQuickTime);
+  on('launchDate', 'change', syncQuickTimeFromMain);
+  on('launchTime', 'change', syncQuickTimeFromMain);
+  on('qNowBtn', 'click', () => {
+    const now = new Date(Date.now() + 10 * 60000);
+    now.setUTCMinutes(Math.ceil(now.getUTCMinutes() / 10) * 10, 0, 0);
+    $('launchDate').value = now.toISOString().slice(0, 10);
+    $('launchTime').value = now.toISOString().slice(11, 16);
+    syncQuickTimeFromMain();
+    recalcExistingTrajectory();
+  });
   on('targetMode', 'change', dismissReleaseHint);
 
   // Weather model chip + popover (cockpit idiom), synced to hidden select
@@ -1466,6 +1704,29 @@ function wireUI() {
       pop.classList.remove('open');
     }
   });
+
+
+  // Airspace overlay controls
+  buildAirspaceMenu();
+  on('menuAirspaceBtn', 'click', () => {
+    const m = mainMenu(); if (m) { m.hidden = true; m.classList.remove('open'); }
+    const am = $('airspaceMenu');
+    if (am) { am.hidden = false; am.classList.add('open'); }
+  });
+  on('airspaceCloseBtn', 'click', () => {
+    const am = $('airspaceMenu');
+    if (am) { am.hidden = true; am.classList.remove('open'); }
+  });
+  document.addEventListener('click', (e) => {
+    const am = $('airspaceMenu');
+    if (am && !am.hidden && !am.contains(e.target) && !e.target.closest('#menuAirspaceBtn')) { am.hidden = true; am.classList.remove('open'); }
+  });
+  let asTimer = null;
+  state.map.on('moveend zoomend', () => {
+    clearTimeout(asTimer);
+    asTimer = setTimeout(refreshAirspaceOverlay, 600);
+  });
+  refreshAirspaceOverlay();
 
   // Collapsible cards
   document.querySelectorAll('.card > h3').forEach(h => {

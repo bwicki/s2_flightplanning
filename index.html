@@ -51,7 +51,7 @@
 </script>
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=26">
+<link rel="stylesheet" href="style.css?v=28">
 </head>
 <body>
 <div id="app">
@@ -62,6 +62,7 @@
     <div id="mainMenu" class="top-popover" hidden>
       <button type="button" id="menuParamsBtn"><span><span class="mbadge green">1</span> Flight settings</span></button>
       <button type="button" id="menuResultsBtn"><span><span class="mbadge amber">2</span> Resulting flight data</span></button>
+      <button type="button" id="menuAirspaceBtn"><span>⬡ Airspace overlay…</span></button>
       <button type="button" id="themeToggle"><span>◐ Day / night</span></button>
     </div>
     <span class="title">SONDE FLIGHT PLANNING</span>
@@ -112,6 +113,12 @@
     <span class="logo-chip"><img src="https://static1.squarespace.com/static/5c603f6f7eb88c2edd690e48/t/5ccdb9f051e58c0001e89503/1556986355383/17_03_17_Wicki_Ballonteam_Logo_RZ.png?format=300w" alt="Wicki Partners Ballonteam" title="Wicki Partners Ballonteam"></span>
   </div>
 
+    <div id="airspaceMenu" class="top-popover as-menu" hidden>
+      <div class="as-head">Airspace overlay <button type="button" id="airspaceCloseBtn" class="overlay-close">✕</button></div>
+      <div class="as-rows" id="airspaceRows"></div>
+      <p class="hint as-note">Approximate planning aid (OpenAIP community data). FL / AGL limits are approximated; NOTAM activations are not reflected. Always check DABS / NOTAM before launch.</p>
+    </div>
+
   <!-- ================= MAIN ================= -->
   <div id="main">
     <div id="mapwrap">
@@ -134,6 +141,7 @@
           <button type="button" id="copyLinkBtn" class="ghost">🔗 Link</button>
           <button type="button" id="exportImageBtn" class="ghost">🖼 Image</button>
         </div>
+        <div id="airspaceWarn" class="as-warn" hidden></div>
         <div class="datagrid">
           <div class="datacell"><label>Surface pressure</label><span class="val" id="resPressure">—</span></div>
           <div class="datacell"><label>Gross lift</label><span class="val" id="resGrossLift">—</span></div>
@@ -157,10 +165,21 @@
 
     <div id="drawerHandle" class="side-handle handle-params" title="Show / hide flight settings"><span class="hbadge">1</span><span class="hlbl">Flight settings</span></div>
 
-    <div id="releaseSliderBox" title="Release altitude">
-      <div class="slider-row">
-        <div class="lbl"><span>Release altitude</span><b id="lblReleaseAlt">3800 m</b></div>
-        <input type="range" id="sReleaseAlt" min="500" max="7000" step="250" value="3800">
+    <div id="quickControls">
+      <div id="launchTimeBox" title="Launch date and time (UTC)">
+        <span class="rs-lbl">Launch</span>
+        <span class="rs-unit">UTC</span>
+        <input type="date" id="qLaunchDate">
+        <input type="time" id="qLaunchTime" step="60">
+        <button type="button" id="qNowBtn" class="ghost">now</button>
+      </div>
+      <div id="releaseSliderBox" title="Release altitude">
+        <div class="rs-head"><span class="rs-lbl">Release</span><b id="lblReleaseAlt">3800</b><span class="rs-unit">m AMSL</span></div>
+        <div class="rs-scale">
+          <span class="rs-tick">7000</span>
+          <div class="vslider-wrap"><input type="range" id="sReleaseAlt" min="500" max="7000" step="250" value="3800"></div>
+          <span class="rs-tick">500</span>
+        </div>
       </div>
     </div>
 
@@ -312,6 +331,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=26"></script>
+<script src="app.js?v=28"></script>
 </body>
 </html>
