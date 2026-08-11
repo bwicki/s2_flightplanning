@@ -51,7 +51,7 @@
 </script>
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=37">
+<link rel="stylesheet" href="style.css?v=41">
 </head>
 <body>
 <div id="app">
@@ -101,17 +101,17 @@
     </select>
     <div class="sep"></div>
 
-    <button type="button" id="airspaceToggleBtn" class="as-toggle" title="Show / hide the selected airspace overlay" aria-pressed="false">
-      <svg class="as-hex" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2l8 5v10l-8 5-8-5V7z"/></svg>
-      <span>Airspace</span>
-      <span class="as-seg"><span class="as-on">on</span><span class="as-off">off</span></span>
-    </button>
-    <div class="sep"></div>
     <div class="legend-chips">
       <span title="Launch"><svg width="14" height="14" viewBox="0 0 30 30"><ellipse cx="15" cy="10" rx="7" ry="8" fill="#4169e1" stroke="#fff" stroke-width="1.5"/><line x1="15" y1="18" x2="15" y2="24" stroke="#fff" stroke-width="1.5"/><rect x="12.8" y="24" width="4.4" height="3.6" rx="0.8" fill="#4169e1" stroke="#fff" stroke-width="1"/></svg>Launch</span>
       <span title="Burst / release"><svg width="14" height="14" viewBox="0 0 30 30"><path d="M15 2 L18 10 L26 6 L21 13 L29 15 L21 17 L26 24 L18 20 L15 28 L12 20 L4 24 L9 17 L1 15 L9 13 L4 6 L12 10 Z" fill="#ffb454" stroke="#0a0d10" stroke-width="1"/><circle cx="15" cy="15" r="3" fill="#e0483f"/></svg>Burst</span>
       <span title="Landing"><svg width="14" height="14" viewBox="0 0 30 30"><path d="M4 13 A11 9 0 0 1 26 13 L15 13 Z" fill="#e0483f" stroke="#fff" stroke-width="1.5"/><line x1="5" y1="13" x2="15" y2="25" stroke="#fff" stroke-width="1.2"/><line x1="25" y1="13" x2="15" y2="25" stroke="#fff" stroke-width="1.2"/><circle cx="15" cy="26" r="2.4" fill="#e0483f" stroke="#fff" stroke-width="1"/></svg>Landing</span>
     </div>
+    <div class="sep"></div>
+    <button type="button" id="airspaceToggleBtn" class="as-toggle" title="Show / hide the selected airspace overlay" aria-pressed="false">
+      <svg class="as-hex" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2l8 5v10l-8 5-8-5V7z"/></svg>
+      <span>Airspace</span>
+      <span class="as-seg"><span class="as-on">on</span><span class="as-off">off</span></span>
+    </button>
     <div class="sep"></div>
     <div class="wx-chip status" id="statusChip"><b id="statusLine">Ready</b><span id="statusSub">open ☰ or click the map</span></div>
 
@@ -130,7 +130,12 @@
   <div id="main">
     <div id="mapwrap">
       <div id="map"></div>
-      <div id="versionChip" class="version-badge"></div>
+      <div id="speedLegendBar" class="legend-bar">
+      <span class="gwl-title">Ground speed:</span>
+      <span class="gwl-grad"></span>
+      <span class="gwl-ticks"><span>0</span><span>25</span><span>50+ km/h</span></span>
+    </div>
+    <div id="versionChip" class="version-badge"></div>
     </div>
 
     <div id="resultsHandle" class="side-handle handle-results closed" title="Show / hide results"><span class="hbadge">2</span><span class="hlbl">Resulting flight data</span></div>
@@ -342,6 +347,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=37"></script>
+<script src="app.js?v=41"></script>
 </body>
 </html>

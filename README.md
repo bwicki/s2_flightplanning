@@ -44,7 +44,7 @@ Open-Meteo Forecast API (−5 to +15 days) with automatic switch to the Archive 
 
 Hamburger menu → **Airspace overlay…** offers per-category toggles, each with its map colour: CTR, Prohibited (P), Restricted (R), Danger (D), TMA, CTA (administrative — listed separately from TMA on purpose), TMZ/RMZ, ATZ, gliding sectors. Data comes from the OpenAIP core API (community-maintained). Because that API sends no CORS headers, requests are routed through public CORS relays when the direct call is blocked.
 
-Enabled categories are drawn as tinted polygons (popup: name, class, vertical limits). After every calculation each trajectory point is tested against position **and** altitude band of the enabled airspaces:
+Enabled categories are drawn as tinted polygons. The polygons are click-through on purpose: clicking the map inside an airspace still sets the launch/landing point; the vertical limits of any violated airspace appear in the conflict box. A top-bar toggle (⬡ Airspace on/off) hides or shows the overlay; the conflict check keeps running either way. After every calculation each trajectory point is tested against position **and** altitude band of the enabled airspaces:
 
 - **Conflict:** red-shaded box in the results listing every violated airspace with the altitude band crossed, "⚠ Airspace conflict" in the status chip, offending polygons highlighted on the map.
 - **No conflict:** green-shaded confirmation line.
@@ -57,14 +57,15 @@ Limits: FL limits are pressure altitudes compared against geometric altitude; AG
 - **Signatures:** royal-blue balloon (launch), explosion star (burst), red parachute with sonde (landing), violet crosshair (desired landing), teal dot (device).
 - **Trajectory:** drawn on a dedicated canvas layer with a genuine linear colour gradient per segment — the hue runs continuously from blue (slow) through green/yellow to red (fast, 0–50 km/h horizontal ground speed) over a dark casing.
 - Clicking launch/burst/landing flies to the point at the base layer's maximum zoom and opens a popup with the details plus an **"Open in Google Maps ↗"** link.
+- While a trajectory is shown, a slim legend bar at the foot of the map explains the speed colours (continuous blue→red gradient, 0 / 25 / 50+ km/h).
 - After every calculation the viewport is fitted to the whole flight path, keeping clear of the open side panels. Zoom control and the cockpit-style scale bar (segments, distance, ≈ 1:x) sit bottom right and slide left while the results panel is open. Version badge bottom left.
 
 ## User interface
 
-- **Top bar:** ☰ menu (entries: 1 Flight settings, 2 Resulting flight data, Airspace overlay…, day/night switch), title, mission-card mode toggle, weather-model chip (tap to change; grouped popover), signature legend, two-line status — all separated by vertical dividers — and the Wicki Partners logo on the right.
-- **Panel 1 · Flight settings (left, green handle, ≤ 20 % of the window):** cards 01 Payload, 02 Balloon (presets in localStorage with inline editor), 03 Fill gas, 04 Site & time (place search, lat/lon, UTC), 05 Flight profile. All values carry small non-bold unit tags (g, m, kg/m³, °N/°E, m AMSL, m/s). On first open a red frame pulses around "Ascent target" and "Release altitude" until touched.
+- **Top bar:** ☰ menu (entries: 1 Flight settings, 2 Resulting flight data, Airspace overlay…, day/night switch, and always "ⓘ About — read first!" opening this document as PDF in a separate window), title, mission-card mode toggle, weather-model chip (tap to change; grouped popover), signature legend, the **⬡ Airspace on/off toggle** (shows/hides the overlay without touching the category selection or the conflict check), and the two-line status — all separated by vertical dividers — with the Wicki Partners logo on the right.
+- **Panel 1 · Flight settings (left, green handle, ≤ 18 % of the window):** cards 01 Payload, 02 Balloon (presets in localStorage with inline editor), 03 Fill gas, 04 Site & time (place search, lat/lon, UTC), 05 Flight profile. All values carry small non-bold unit tags (g, m, kg/m³, °N/°E, m AMSL, m/s). On first open a red frame pulses around "Ascent target" and "Release altitude" until touched.
 - **Quick controls below the green handle** (move with the panel): a compact launch-time box — date/time editable in **LT or UTC** (segment toggle, persisted), with a conversion line always showing the other zone, plus a "now" button — and the **vertical release-altitude slider** (m AMSL, 500–7 000, 250 m steps) in the cockpit slider idiom. Every change re-runs the current prediction.
-- **Panel 2 · Resulting flight data (right, amber handle, ≤ 25 %):** exports (JSON, print, share link, PNG), the airspace conflict box, a data grid styled identically to the left panel (small labels, non-bold dark-grey mono values, explicit units), and the two-panel profile chart: altitude profile coloured by horizontal speed classes on top, the ground-speed curve (km/h, max labelled) below, dashed burst line through both, colour legend.
+- **Panel 2 · Resulting flight data (right, amber handle, ≤ 18 %):** exports (JSON, print, share link, PNG), the airspace conflict box, a data grid styled identically to the left panel (small labels, non-bold dark-grey mono values, explicit units), and the two-panel profile chart: altitude profile coloured by horizontal speed classes on top, the ground-speed curve (km/h, max labelled) below, dashed burst line through both, colour legend.
 - Both panels open/close via the large labelled vertical handles (1 Flight settings / 2 Resulting flight data) or the hamburger menu.
 
 ## Desktop & iPad (PWA)
@@ -80,6 +81,7 @@ Full-viewport layout with safe-area insets and cockpit-sized touch targets. Appl
 | `app.js` | Physics, Open-Meteo + OpenAIP integration, map/canvas rendering, UI logic; `APP_VERSION` at the top |
 | `apple-touch-icon.png` | 180×180 iOS home-screen tile |
 | `icon-4b.svg` | Source SVG of the app icon |
+| `readme.pdf` | This document as PDF, linked from the ☰ menu ("About — read first!") |
 
 ## Deployment (GitHub Pages)
 

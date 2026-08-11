@@ -288,7 +288,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 /* vertical release slider */
 .rs-head{display:flex;flex-direction:column;align-items:center;gap:0;line-height:1.25;}
 .rs-lbl{font-size:8.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);}
-#lblReleaseAlt{font-family:var(--mono);font-size:13.5px;color:var(--accent2);font-weight:700;}
+#lblReleaseAlt{font-family:var(--mono);font-size:13.5px;color:var(--text);font-weight:400;}
 .rs-unit{font-size:8px;color:var(--muted);}
 .rs-scale{display:flex;flex-direction:column;align-items:center;gap:3px;}
 .rs-tick{font-size:8px;color:var(--muted);font-family:var(--mono);}
@@ -329,3 +329,13 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 .as-seg span{padding:2px 7px;color:var(--muted);}
 .as-toggle:not(.on) .as-off{background:var(--panel);color:var(--text);}
 .as-toggle.on .as-on{background:var(--accent);color:#00201d;}
+
+/* Speed legend bar at the map foot (cockpit legend-bar idiom) */
+.legend-bar{position:absolute;left:50%;transform:translateX(-50%);bottom:8px;background:rgba(20,26,33,0.88);color:#fff;padding:5px 12px;border-radius:8px;font-size:10.5px;font-weight:600;display:none;z-index:600;box-shadow:0 2px 8px rgba(0,0,0,.3);align-items:center;gap:9px;white-space:nowrap;}
+.legend-bar.show{display:flex;}
+.legend-bar .gwl-title{color:#aab4c0;font-weight:600;flex-shrink:0;}
+.gwl-grad{display:inline-block;width:130px;height:8px;border-radius:4px;background:linear-gradient(90deg,hsl(215,82%,55%),hsl(161,82%,55%),hsl(108,82%,55%),hsl(54,82%,55%),hsl(0,82%,55%));}
+.gwl-ticks{display:inline-flex;gap:14px;}
+.gwl-ticks span{font-size:8.5px;color:#aab4c0;font-weight:400;}
+body.day .legend-bar{background:rgba(255,255,255,0.92);color:#16202a;box-shadow:0 2px 8px rgba(0,0,0,.18);}
+body.day .legend-bar .gwl-title,body.day .gwl-ticks span{color:#5c6b78;}

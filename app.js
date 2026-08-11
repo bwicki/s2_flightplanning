@@ -348,7 +348,7 @@ function computeTrajectory(opts) {
 // Balloon presets (persisted in localStorage; safe fallback when blocked)
 // =========================================================================
 const DEFAULT_PRESETS = [
-  { id: 'qualatex-9', name: 'Qualatex 9 g (latex party balloon)', weight: 9 },
+  { id: 'qualatex-9', name: 'Qualatex 9 g (latex balloon)', weight: 9 },
   { id: 'latex-11', name: 'Latex 11 g', weight: 11 },
   { id: 'latex-30', name: 'Latex 30 g', weight: 30 },
 ];
@@ -360,7 +360,15 @@ function loadPresets() {
     const raw = localStorage.getItem(PRESETS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length) return parsed;
+      if (Array.isArray(parsed) && parsed.length) {
+        // Migration: drop the old "party" wording from persisted lists.
+        let changed = false;
+        parsed.forEach(p => {
+          if (p && p.name === 'Qualatex 9 g (latex party balloon)') { p.name = 'Qualatex 9 g (latex balloon)'; changed = true; }
+        });
+        if (changed) savePresets(parsed);
+        return parsed;
+      }
     }
   } catch (e) { /* storage blocked */ }
   return presetsMemory || DEFAULT_PRESETS.map(p => ({ ...p }));
@@ -530,7 +538,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.37.0 · 2026-08-10';
+const APP_VERSION = 'v1.41.0 · 2026-08-11';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -978,6 +986,8 @@ const GradientPathLayer = L.Layer.extend({
 function drawTrajectory(traj) {
   if (state.trajectoryCasing) { state.map.removeLayer(state.trajectoryCasing); state.trajectoryCasing = null; }
   if (state.trajectoryGradient) { state.map.removeLayer(state.trajectoryGradient); state.trajectoryGradient = null; }
+  const slb0 = $('speedLegendBar');
+  if (slb0 && !state.trajectoryLine) slb0.classList.remove('show');
   if (state.trajectoryLine) state.map.removeLayer(state.trajectoryLine);
   if (state.releaseMarker) state.map.removeLayer(state.releaseMarker);
   if (state.landMarker) state.map.removeLayer(state.landMarker);
@@ -1012,6 +1022,8 @@ function drawTrajectory(traj) {
   state.trajectoryGradient = new GradientPathLayer(latlngs, vColors).addTo(state.map);
   // Invisible polyline keeps bounds/fitting and the "trajectory exists" checks working.
   state.trajectoryLine = L.polyline(latlngs, { opacity: 0, weight: 1, interactive: false }).addTo(state.map);
+  const slb = $('speedLegendBar');
+  if (slb) slb.classList.add('show');
 
   const releasePt = traj.path[traj.releaseIdx];
   state.releaseMarker = sigMarker(releasePt.lat, releasePt.lon, 'release').addTo(state.map)
@@ -1464,8 +1476,9 @@ async function refreshAirspaceOverlay() {
       polys.forEach(poly => {
         if (!poly || !poly[0]) return;
         const latlngs = poly.map(ring => ring.map(pt => [pt[1], pt[0]]));
-        const layer = L.polygon(latlngs, { color: cat.color, weight: 1.5, opacity: 0.9, fillColor: cat.color, fillOpacity: 0.12 });
-        layer.bindPopup(`<b>${it.name || 'Airspace'}</b><br>${cat.label}${it.icaoClass !== undefined && it.icaoClass !== 8 ? ' · class ' + 'ABCDEFG'[it.icaoClass] : ''}<br>${asLimitText(it.lowerLimit)} – ${asLimitText(it.upperLimit)}`);
+        // interactive:false lets map clicks pass through the polygons, so
+        // setting a launch/landing point works with the overlay visible.
+        const layer = L.polygon(latlngs, { color: cat.color, weight: 1.5, opacity: 0.9, fillColor: cat.color, fillOpacity: 0.12, interactive: false });
         layer._asMeta = it;
         layers.push(layer);
       });
