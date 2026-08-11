@@ -507,7 +507,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.15.0 · 2026-08-10';
+const APP_VERSION = 'v1.17.0 · 2026-08-10';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -914,51 +914,112 @@ function drawTrajectory(traj) {
 // ---------------------------------------------------------------------
 function drawProfile(traj) {
   const svg = $('profileSvg');
-  const W = 420, H = 280, padL = 48, padB = 28, padT = 10, padR = 10;
-  const plotW = W - padL - padR, plotH = H - padB - padT;
+  const W = 420, H = 330, padL = 48, padR = 10;
+  const p1T = 8, p1H = 168, p1B = p1T + p1H;
+  const p2T = p1B + 20, p2H = 82, p2B = p2T + p2H;
+  const plotW = W - padL - padR;
 
   const maxT = traj.totalTimeSec;
   const minA = Math.floor(traj.path[0].alt / 500) * 500;
-  const maxAraw = traj.path[traj.releaseIdx].alt;
-  const maxA = Math.ceil(maxAraw / 500) * 500;
+  const maxA = Math.ceil(traj.path[traj.releaseIdx].alt / 500) * 500;
 
   const x = t => padL + (t / maxT) * plotW;
-  const y = a => padT + plotH - ((a - minA) / (maxA - minA)) * plotH;
+  const yA = a => p1T + p1H - ((a - minA) / (maxA - minA)) * p1H;
+
+  // Horizontal ground speed per segment (km/h)
+  const speeds = [0];
+  for (let i = 1; i < traj.path.length; i++) {
+    const a = traj.path[i - 1], b = traj.path[i];
+    const dt = b.t - a.t;
+    speeds.push(dt > 0 ? haversine(a.lat, a.lon, b.lat, b.lon) / dt * 3.6 : speeds[i - 1]);
+  }
+  speeds[0] = speeds.length > 1 ? speeds[1] : 0;
+  const maxS = Math.max(...speeds);
+  const niceS = Math.max(10, Math.ceil(maxS / 10) * 10);
+  const yS = v => p2T + p2H - (v / niceS) * p2H;
+  const maxIdx = speeds.indexOf(maxS);
+
+  const spdColor = v => v < 15 ? '#3f7fd0' : v < 30 ? '#3fd06b' : v < 45 ? '#ffb454' : '#e0483f';
 
   let grid = '';
-  // Horizontal grid lines every 500 m
   for (let a = minA; a <= maxA; a += 500) {
-    const yy = y(a);
+    const yy = yA(a);
     const major = a % 2500 === 0;
     grid += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="var(--grid-line)" stroke-width="${major ? 1 : 0.5}" opacity="${major ? 0.9 : 0.5}"/>`;
     if (major) grid += `<text x="${padL - 5}" y="${yy + 3}" text-anchor="end" fill="var(--text-dim)" font-size="8.5" font-family="IBM Plex Mono">${(a / 1000).toFixed(1)}k</text>`;
   }
-  // Vertical grid lines every 10 min
   const stepT = 600;
-  const labelEvery = Math.max(1, Math.ceil((maxT / stepT) / 8)); // avoid label crowding
+  const labelEvery = Math.max(1, Math.ceil((maxT / stepT) / 8));
   let k = 0;
   for (let t = 0; t <= maxT; t += stepT, k++) {
     const xx = x(t);
     const labelled = k % labelEvery === 0;
-    grid += `<line x1="${xx}" y1="${padT}" x2="${xx}" y2="${H - padB}" stroke="var(--grid-line)" stroke-width="${labelled ? 1 : 0.5}" opacity="${labelled ? 0.9 : 0.5}"/>`;
-    if (labelled) grid += `<text x="${xx}" y="${H - padB + 12}" text-anchor="middle" fill="var(--text-dim)" font-size="8.5" font-family="IBM Plex Mono">${Math.round(t / 60)}′</text>`;
+    grid += `<line x1="${xx}" y1="${p1T}" x2="${xx}" y2="${p1B}" stroke="var(--grid-line)" stroke-width="${labelled ? 1 : 0.5}" opacity="${labelled ? 0.9 : 0.5}"/>`;
+    grid += `<line x1="${xx}" y1="${p2T}" x2="${xx}" y2="${p2B}" stroke="var(--grid-line)" stroke-width="${labelled ? 1 : 0.5}" opacity="${labelled ? 0.9 : 0.5}"/>`;
+    if (labelled) grid += `<text x="${xx}" y="${p2B + 12}" text-anchor="middle" fill="var(--text-dim)" font-size="8.5" font-family="IBM Plex Mono">${Math.round(t / 60)}′</text>`;
   }
+  // Speed panel horizontal grid: half + full scale
+  [niceS / 2, niceS].forEach(v => {
+    const yy = yS(v);
+    grid += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="var(--grid-line)" stroke-width="0.5" opacity="0.6"/>`;
+    grid += `<text x="${padL - 5}" y="${yy + 3}" text-anchor="end" fill="var(--text-dim)" font-size="8.5" font-family="IBM Plex Mono">${Math.round(v)}</text>`;
+  });
 
-  let d = `M ${x(0)} ${y(traj.path[0].alt)}`;
-  traj.path.forEach(p => { d += ` L ${x(p.t)} ${y(p.alt)}`; });
+  // Altitude profile: consecutive segments merged per speed class (option A)
+  let altSegs = '';
+  let segD = `M ${x(traj.path[0].t)} ${yA(traj.path[0].alt)}`;
+  let segCol = spdColor(speeds[1] || 0);
+  for (let i = 1; i < traj.path.length; i++) {
+    const col = spdColor(speeds[i]);
+    const px = x(traj.path[i].t), py = yA(traj.path[i].alt);
+    if (col !== segCol) {
+      altSegs += `<path d="${segD}" fill="none" stroke="${segCol}" stroke-width="2.4" stroke-linecap="round"/>`;
+      segD = `M ${x(traj.path[i - 1].t)} ${yA(traj.path[i - 1].alt)} L ${px} ${py}`;
+      segCol = col;
+    } else {
+      segD += ` L ${px} ${py}`;
+    }
+  }
+  altSegs += `<path d="${segD}" fill="none" stroke="${segCol}" stroke-width="2.4" stroke-linecap="round"/>`;
+
+  // Ground speed panel (option C): area + line
+  let spdLine = `M ${x(traj.path[0].t)} ${yS(speeds[0])}`;
+  for (let i = 1; i < traj.path.length; i++) spdLine += ` L ${x(traj.path[i].t)} ${yS(speeds[i])}`;
+  const spdArea = spdLine + ` L ${x(traj.path[traj.path.length - 1].t)} ${p2B} L ${x(traj.path[0].t)} ${p2B} Z`;
 
   const releaseP = traj.path[traj.releaseIdx];
   const landP = traj.path[traj.path.length - 1];
+  const bx = x(releaseP.t);
+  const mx = x(traj.path[maxIdx].t), my = yS(speeds[maxIdx]);
+  const maxLabelX = Math.min(Math.max(mx, padL + 30), W - padR - 40);
+
+  const legY = p2B + 20;
+  const legend = `
+    <rect x="${padL}" y="${legY}" width="13" height="6" fill="#3f7fd0"/>
+    <rect x="${padL + 13}" y="${legY}" width="13" height="6" fill="#3fd06b"/>
+    <rect x="${padL + 26}" y="${legY}" width="13" height="6" fill="#ffb454"/>
+    <rect x="${padL + 39}" y="${legY}" width="13" height="6" fill="#e0483f"/>
+    <text x="${padL + 58}" y="${legY + 6}" fill="var(--text-dim)" font-size="8" font-family="IBM Plex Mono">&lt;15 / 15–30 / 30–45 / &gt;45 km/h horiz.</text>
+    <text x="${W - padR}" y="${legY + 6}" text-anchor="end" fill="var(--text-dim)" font-size="8" font-family="IBM Plex Mono">max ${Math.round(maxS)} km/h</text>
+  `;
 
   svg.innerHTML = `
     ${grid}
-    <rect x="${padL}" y="${padT}" width="${plotW}" height="${plotH}" fill="none" stroke="var(--grid-line)" stroke-width="1"/>
-    <path d="${d}" fill="none" stroke="#4fd1c5" stroke-width="2"/>
-    <circle cx="${x(0)}" cy="${y(traj.path[0].alt)}" r="3.5" fill="#59d18f"/>
-    <circle cx="${x(releaseP.t)}" cy="${y(releaseP.alt)}" r="3.5" fill="#ffb020"/>
-    <circle cx="${x(landP.t)}" cy="${y(landP.alt)}" r="3.5" fill="#ff6b6b"/>
-    <text x="${padL - 5}" y="${padT + 4}" text-anchor="end" fill="var(--text-dim)" font-size="8.5" font-family="IBM Plex Mono">m</text>
-    <text x="${W - padR}" y="${H - 4}" text-anchor="end" fill="var(--text-dim)" font-size="8.5" font-family="IBM Plex Mono">min</text>
+    <rect x="${padL}" y="${p1T}" width="${plotW}" height="${p1H}" fill="none" stroke="var(--grid-line)" stroke-width="1"/>
+    <rect x="${padL}" y="${p2T}" width="${plotW}" height="${p2H}" fill="none" stroke="var(--grid-line)" stroke-width="1"/>
+    <line x1="${bx}" y1="${p1T}" x2="${bx}" y2="${p2B}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3" opacity="0.8"/>
+    <path d="${spdArea}" fill="#3fd0c9" opacity="0.12"/>
+    <path d="${spdLine}" fill="none" stroke="#3fd0c9" stroke-width="1.8"/>
+    ${altSegs}
+    <circle cx="${x(0)}" cy="${yA(traj.path[0].alt)}" r="3.5" fill="#3fd06b" stroke="#fff" stroke-width="1"/>
+    <circle cx="${bx}" cy="${yA(releaseP.alt)}" r="3.8" fill="#ffb454" stroke="#fff" stroke-width="1"/>
+    <circle cx="${x(landP.t)}" cy="${yA(landP.alt)}" r="3.5" fill="#e0483f" stroke="#fff" stroke-width="1"/>
+    <circle cx="${mx}" cy="${my}" r="2.8" fill="#3fd0c9" stroke="#fff" stroke-width="1"/>
+    <text x="${maxLabelX}" y="${Math.max(my - 5, p2T + 8)}" text-anchor="middle" fill="var(--text-dim)" font-size="8" font-family="IBM Plex Mono">${Math.round(maxS)} km/h</text>
+    <text x="${padL - 5}" y="${p1T + 4}" text-anchor="end" fill="var(--text-dim)" font-size="8.5" font-family="IBM Plex Mono">m</text>
+    <text x="${padL - 5}" y="${p2T + 4}" text-anchor="end" fill="var(--text-dim)" font-size="8.5" font-family="IBM Plex Mono">km/h</text>
+    <text x="${W - padR}" y="${p2B + 12}" text-anchor="end" fill="var(--text-dim)" font-size="8.5" font-family="IBM Plex Mono">min</text>
+    ${legend}
   `;
 }
 

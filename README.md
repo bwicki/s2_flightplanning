@@ -1,76 +1,73 @@
-# Gas Balloon Landing Predictor (GBLP)
+# Weather Sonde Flight Planning
 
-A single-page web app for long-distance gas balloon flights. It helps plan a safe descent and landing area — including at night or above a closed cloud layer — based on current position, live wind forecasts, and configurable descent parameters.
+Statische Web-App zur Flugplanung von Wetterballon-Sonden (Pilotballon / Radiosonde): Sie berechnet Gasfüllung, Bersthöhe und die vollständige Flugtrajektorie (Aufstieg – Burst/Release – Abstieg am Fallschirm) auf Basis realer Wind- und Wetterdaten von Open-Meteo und stellt alles auf einer interaktiven Karte dar.
 
-**Current version: v61** (29.07.2026) — this number always matches the `APP_VERSION` constant near the top of the script in `index.html` and the version chip shown in the app's header.
-
-No installation needed: open `index.html` in a browser (works as a home-screen PWA on iPad/iPhone via "Add to Home Screen"). No backend or server of any kind — everything runs entirely in the browser, using free public APIs (Open-Meteo for weather, OpenStreetMap/Overpass for map data, openAIP for airspace, Nominatim for place names).
-
----
-
-## The two main functions
-
-The map has a mode toggle (top-left, below any warning banners) that switches between:
-
-### 1. Landing Area (default, always live)
-Continuously projects where the balloon would land if descent were initiated now, using the current position, course/speed, and the descent parameters below. Shows:
-- The projected flight path (teal cruise segment → yellow descent segment)
-- A Monte-Carlo-based landing area (accounts for forecast uncertainty, scaled by how old the weather model run is)
-- Ground wind at the landing site, with a trend arrow
-
-### 2. Plan Descent
-Tap anywhere on the map to set an "Intended Landing Point" (red crosshair). The app searches for the descent-initiation time that lands closest to that point, using the forecast wind for the actual arrival hour (not "now"), and shows:
-- A violet descent-initiation marker — **drag it** to manually override the plan and see the landing area recalculate live
-- The same landing-area/path visualization, in the planning colors (violet dashed path, orange landing area)
-- "Estimated Descent Point" (time + distance) in the sidebar
-
-Switching back to Landing Area leaves the last planned area visible on the map (with a delete button) until you plan a new one or clear it.
+**Live:** https://bwicki.github.io/s2_flightplanning/
+**Stack:** Reines HTML/CSS/JavaScript, kein Build-Schritt, kein Backend. Leaflet für die Karte, html2canvas für den Bildexport. Design-System übernommen aus der Gasballoon-Cockpit-App (Wicki Partners Ballonteam).
 
 ---
 
-## Map layers (header icons)
+## Funktionsumfang
 
-Each toggle button shows a small traffic-light dot: invisible when off, yellow while loading, green once ready.
+### Zwei Planungsmodi (Umschalter in der Kopfzeile)
+- **⬈ Forward — set launch:** Klick auf die Karte setzt den Startort; die App berechnet sofort automatisch die Trajektorie und den voraussichtlichen Landepunkt.
+- **⬊ Backward — set landing:** Klick setzt den gewünschten Landepunkt (violettes Fadenkreuz); die App löst iterativ rückwärts nach einem passenden Startort auf und zeigt die Restabweichung in km.
 
-| Icon | Layer | Source |
-|---|---|---|
-| ⚡ | Power lines | OpenInfraMap vector tiles |
-| 🛣️ | Roads + place names | Esri roads / Overpass (bounded to ~35-40km around map center to stay fast) |
-| ✈️ | Airspace (raster) | openAIP tiles |
-| 🌬 | Ground wind particles | Computed from the loaded weather model |
-| 🌳 | Nature reserves & protected areas | Overpass (red hatched outline) |
+### Berechnungsmodell
+- **Atmosphäre:** ICAO-Standardatmosphäre, am lokalen Bodendruck und der lokalen Temperatur (aus dem Wettermodell) verankert.
+- **Ballonfüllung:** Kräftebilanz Auftrieb – Gewicht – aerodynamischer Widerstand (cw ≈ 0,25); das nötige Gasvolumen wird per Bisektion auf die gewählte Ziel-Steigrate gelöst. Ausgabe: Brutto-/Netto-Lift (g), Füllvolumen (m³), Startdurchmesser (m).
+- **Bersthöhe:** Ideale Gasexpansion mit der Höhe vs. Berstdurchmesser. Der Berstdurchmesser wird aus dem Ballongewicht geschätzt (Potenzfit D = 0,208 · w^0,456 aus Herstellertabellen 100–3000 g) und kann manuell übersteuert werden.
+- **Trajektorie:** Integration in 200-m-Höhenschritten; u/v-Wind aus den Druckflächen des Wettermodells (1000–30 hPa plus 10-m-Wind) höheninterpoliert. Abstieg am Fallschirm mit dichteskalierter Sinkrate (v ∝ 1/√ρ, Referenz = eingegebene Rate auf Meereshöhe).
+- **Tropopause:** Bestimmung nach WMO-Kriterium (Temperaturgradient ≤ 2 K/km über 4,5 km) aus den Modelltemperaturen, Anzeige im Ergebnis.
+- **Aufstiegsziel:** wahlweise feste Release-Höhe (m AMSL) oder Aufstieg bis zum Bersten.
 
-Base map: Streets / Terrain / Satellite (top-right Leaflet control). Default on first load: Streets + ground wind particles only.
+### Wetterdaten
+- **Quelle:** Open-Meteo Forecast API (±5 Tage Vergangenheit bis +15 Tage); ältere Zeitpunkte automatisch über die Archive API (historische Reanalyse).
+- **Modellwahl** über den Chip in der Kopfzeile (Popover, gruppiert):
+  - *Automatic:* Best match (Auto-Blend)
+  - *Global:* ECMWF IFS 0.25° / AIFS (AI), GFS Seamless / Global / GraphCast (AI), ICON Seamless / Global, GEM, Météo-France / ARPEGE World, UKMO, JMA, KMA, CMA, BOM
+  - *Europa regional:* ICON-D2 2 km, ICON-EU 7 km, ARPEGE Europe, AROME France 1.3 km / HD, UKMO UKV 2 km, KNMI & DMI HARMONIE, MET Norway Nordic 1 km, ICON-2I Italien
+  - *Regional übrige:* HRRR 3 km, NBM CONUS, GEM Regional / HRDPS, JMA MSM
+- **Robustheit:** Deckt ein Regionalmodell Ort/Zeitraum nicht ab oder schlägt die Abfrage fehl, fällt die App automatisch auf *Best match* zurück (Hinweis im Ergebnis). Fehlende Druckflächen einzelner Modelle werden übersprungen und interpoliert.
 
-## Sidebar
+### Karte
+- Leaflet-Vollbildkarte; Start zentriert auf die Geräteposition (Geolokation, Zoom 12 ≈ 20 km), Fallback Zürich.
+- **Basiskarten** (Radio-Control oben rechts): Streets (OSM), Terrain (OpenTopoMap), Satellite (Esri), Light (Carto).
+- **Signaturen:** Ballon (Start, grün), Explosionsstern (Burst, amber/rot), Fallschirm mit Sonde (Landung, rot), Fadenkreuz (Wunschlandepunkt, violett), Positionspunkt (Gerät, teal). Trajektorie als Teal-Linie mit dunkler Unterlage (auf jeder Basiskarte lesbar).
+- Klick auf Start-/Burst-/Landesymbol zoomt maximal auf den Punkt (flyTo, Zoom ≥ 15).
+- Nach jeder Berechnung wird der Ausschnitt automatisch so gewählt, dass der ganze Flugpfad sichtbar ist — unter Berücksichtigung der geöffneten Seitenspalten.
+- Zoombuttons und Cockpit-Maßstabsleiste (Segmente, Distanz, ≈ 1:x) unten rechts; sie weichen animiert nach links aus, wenn die Ergebnisspalte offen ist. Versionsbadge unten links.
 
-- **Current Position** — live GPS fix, or manual entry in Test Mode
-- **Projected/Planned Landing Area** — see above; title turns "PLANNED" (red) only while planning
-- **Descent Parameters** — initiation delay, descent rate (with live adiabatic-braking readout), intercept height, post-intercept rate, Monte-Carlo scatter (default 15%)
-- **Flight Charts** (collapsed by default) — Wind Profile and Hodograph, both reflecting the planned descent point's location/time while planning
+### Oberfläche
+- **Kopfzeile:** ☰-Menü, Titel, Forward/Backward-Umschalter, Wettermodell-Chip, Legende, zweizeiliger Status-Chip, 📊 Ergebnisse, ◐ Tag/Nacht-Theme, Wicki-Partners-Logo.
+- **Spalte 1 · Parameters (links, grüner Handle):** max. 27 % der Fensterbreite; Cards 01 Payload (SparvEmbedded S2 9 g), 02 Balloon (Presets in localStorage mit Inline-Editor), 03 Fill gas (Ballongas Linde 0,90 kg/m³, Helium, H₂, Custom), 04 Site & time (Ortssuche via Open-Meteo-Geocoding, Lat/Lon, UTC-Zeit), 05 Flight profile (Zielhöhe, Steigrate 1–4 m/s, Sinkrate), Calculate.
+- **Spalte 2 · Resulting flight data (rechts, amber Handle):** Exporte (JSON, Print, Share-Link mit allen Parametern in der URL, PNG-Bild), Datengrid — jede Größe mit expliziter Einheit (hPa, g, m³, m, m AMSL, km, h min) — und das Profil-Diagramm.
+- **Profil-Diagramm (2 Panels, gemeinsame Zeitachse):** oben das Höhenprofil, segmentweise nach Horizontalgeschwindigkeit eingefärbt (blau < 15, grün 15–30, amber 30–45, rot > 45 km/h); darunter die Groundspeed-Kurve in km/h mit markiertem Maximum; gestrichelte Burst-Linie durch beide Panels; Farblegende.
+- Beide Spalten sind über die beschrifteten seitlichen Handles (1 Parameters / 2 Resulting flight data) jederzeit ein- und ausklappbar; Cards einzeln kollabierbar.
 
-## Test / Manual Mode
+### Desktop & iPad (PWA)
+- Vollbild-Layout (100 dvh, Safe-Area-Insets), Touch-Ziele in Cockpit-Größe, Apple-Web-App-Metatags: über Safari → Teilen → „Zum Home-Bildschirm" läuft die App randlos wie eine native App; `apple-touch-icon.png` liefert die Kachel (Icon „4b": Teal, Flugbogen mit Burst und Fallschirm).
+- Keine `prompt()/alert()/confirm()`-Dialoge (in iOS-Standalone-Apps deaktiviert) — alles über Inline-UI.
+- **Fehlerdiagnose ohne Konsole:** Laufzeit- und Ressourcen-Ladefehler erscheinen als roter Banner (Reporter sitzt im `<head>`, greift also auch, wenn app.js selbst nicht lädt). Mit `?debug` an der URL öffnet sich eine On-Screen-Konsole (Eruda).
 
-If GPS drops out, a banner offers to enable Manual Mode (tap position manually, or type exact Alt/Course/Speed). When GPS comes back, the same banner asks whether to leave Manual Mode again, rather than silently switching back.
+---
 
-## Emergency contact
+## Dateien
 
-The red warning-triangle button (left of Test Mode) prepares a position report for WhatsApp/SMS (up to 5 recipients)/Email. All contact details (pilot name, aircraft registration, mobile + second/SatPhone number, email, SMS recipients) are configured once in Settings and stored only on this device. **Important:** this is a static page with no server — it cannot send anything silently in the background. Each channel opens the corresponding app (wa.me / sms: / mailto:) with the message pre-filled; you still tap "send" yourself. Every attempt is logged in the Flight Log.
+| Datei | Zweck |
+|---|---|
+| `index.html` | Markup, PWA-Metatags, Favicon (SVG-Data-URI), Fehler-Reporter, CDN-Einbindung (Leaflet, html2canvas via jsdelivr) |
+| `style.css` | Komplettes Styling; Designsystem/Farbvariablen aus der Gasballoon-Cockpit-App, Tagmodus über `body.day` |
+| `app.js` | Physikmodell, Open-Meteo-Anbindung, Karte, Trajektorien-Rendering, UI-Logik; `APP_VERSION` ganz oben |
+| `apple-touch-icon.png` | 180×180-Kachel für den iOS-Home-Bildschirm |
+| `icon-4b.svg` | Quell-SVG des App-Icons |
 
-## Adiabatic braking model
+## Deployment (GitHub Pages)
 
-Gas compressed adiabatically during a fast descent stays warmer (and less dense) than it would in slow thermal equilibrium with the surrounding air, giving extra buoyancy — a real, physically-understood effect that increases with descent rate (faster descent → less time for heat to escape → more retained warmth), saturating toward a fully-adiabatic maximum. This extra buoyancy is mathematically equivalent to having dropped that many kg of ballast, so it's expressed as a fraction of the balloon's total system mass (configurable in Settings, alongside gas volume) — a heavier system is proportionally less affected by the same absolute ballast-equivalent. The "Empirical variance factor" setting lets you scale the whole effect to match your own logged flights.
+1. Die vier App-Dateien per Drag & Drop auf `github.com/bwicki/s2_flightplanning` → *Add file → Upload files* auf `main` committen.
+2. GitHub Pages ist auf *main / root* eingestellt; die Seite ist nach ~1 Minute unter https://bwicki.github.io/s2_flightplanning/ aktuell.
+3. Browser mit Hard-Reload laden (Ctrl/Cmd+Shift+R). Die Query-Parameter `?v=N` an CSS/JS in `index.html` dienen als Cache-Buster und werden bei jedem Release hochgezählt; `APP_VERSION` in `app.js` (Badge unten links auf der Karte) muss dazu passen.
 
-## Known limitations & approximations
+## Grenzen des Modells
 
-- **No backend of any kind.** Emergency messages, CSV/Dropbox uploads, etc. are all client-side only — see the Emergency Contact section above.
-- **Free public APIs**, not guaranteed uptime or rate limits. Overpass-based layers (nature reserves, place names) retry automatically with a cooldown and mirror rotation if the primary server is overloaded.
-- **openAIP's Core API is CORS-blocked** for browser requests — real per-class airspace filtering and automated airspace-crossing warnings aren't possible from this page; only the combined raster tile overlay is shown.
-- **Satellite count isn't available.** The standard browser Geolocation API only exposes latitude/longitude/altitude/accuracy/heading/speed — not satellite count, which requires native GPS-chip access no web page has.
-- **In-page screen recording doesn't work on iPhone/iPad.** iOS Safari has no Screen Capture API at all (an Apple/WebKit platform limitation) — the recording button detects this and points to iOS's own Control Center recording instead. On desktop browsers that do support it, the button pulses red with a stop icon while recording.
-- **A dashed ring shows the pre-cached tile area's boundary** once zoomed out far enough for it to be a useful reference; the area outside it greys out.
-- **Flight Charts is hidden by default** entirely (not just collapsed) - a header toggle (left of Day/Night) shows/hides it.
-- **Plan Descent shows a 360-minute reference trajectory** at the current cruise altitude (light grey dashed) - purely informational, to help judge which areas are reachable before committing to a target point.
-- **A custom scale bar** (km and nautical miles) sits left of the zoom buttons.
-- **Adiabatic braking and Monte-Carlo scatter are approximations**, not calibrated against real flight data — treat as a planning aid, not a certified instrument.
-- **Cloud file pickers** (Dropbox, Google Drive, etc.) shown when uploading a file are controlled entirely by iOS/the browser, based on which provider apps are installed — not something this page can add to or configure.
+Alle Ergebnisse sind Planungsnäherungen: Berstdurchmesser aus einem Pauschalfit (Herstellerstreuung erheblich), konstante Ziel-Steigrate statt thermischer Effekte, Windfeld zeitlich auf die nächstliegende Modellstunde gerastert, keine Berücksichtigung von Vereisung, Superpressure oder Ballonpendeln. Vor jedem realen Start Herstellerdatenblatt, NOTAM und Luftraumstruktur prüfen.
