@@ -6,7 +6,7 @@
   --violet:#b78cff; --grid-line:#2a3540;
   --mono:'SF Mono','Consolas','Menlo',monospace;
   --sans:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
-  --drawer-w:min(620px,94vw);
+  --drawer-w:clamp(250px,27vw,620px);
 }
 body.day{
   --bg:#eef1f3; --panel:#ffffff; --panel2:#f4f6f8; --border:#d3dae0;
@@ -87,7 +87,7 @@ body.day #map{background:#dfe6ea;}
 .drawer-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
 .drawer-head span{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-weight:700;}
 .drawer-head .overlay-close{position:static;}
-.drawer-grid{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px;align-content:start;scrollbar-width:none;}
+.drawer-grid{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:6px;display:grid;grid-template-columns:1fr;gap:5px;align-content:start;scrollbar-width:none;}
 .drawer-grid::-webkit-scrollbar{display:none;}
 .card.wide2,.calc-card{grid-column:1/-1;}
 @media (max-width:560px){.drawer-grid{grid-template-columns:1fr;}.card.wide2{grid-column:1;}}
@@ -102,7 +102,7 @@ body.day #map{background:#dfe6ea;}
 
 /* label-above-value cells (cockpit datacell idiom, editable) */
 .cellgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px 5px;}
-.cellgrid.cols4{grid-template-columns:repeat(4,1fr);}
+.cellgrid.cols4{grid-template-columns:1fr 1fr;}
 @media (max-width:560px){.cellgrid.cols4{grid-template-columns:1fr 1fr;}}
 .fcell{background:var(--panel);border-radius:6px;padding:4px 6px 5px;overflow:hidden;min-width:0;}
 .fcell > label{display:block;font-size:8.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -155,7 +155,7 @@ button.primary:active{transform:scale(0.99);}
 @media (max-width:640px){.datagrid{grid-template-columns:1fr 1fr;}}
 .datacell{background:var(--panel);border-radius:6px;padding:6px 8px;overflow:hidden;}
 .datacell label{display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
-.datacell .val{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--accent2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;}
+.datacell .val{font-family:var(--mono);font-size:17px;font-weight:700;color:var(--accent2);display:block;line-height:1.25;white-space:normal;word-break:break-word;}
 .datacell .val.small{font-size:10.5px;white-space:normal;}
 .datacell.wide{grid-column:1/-1;}
 
@@ -224,3 +224,7 @@ button.primary:active{transform:scale(0.99);}
 .map-scale-ruler > div:nth-child(even){background:#fff;}
 .map-scale-text{font-weight:700;white-space:nowrap;text-align:center;}
 .map-scale-ratio{font-weight:400;}
+
+.datacell .val .unit{font-size:11px;font-weight:600;color:var(--muted);margin-left:3px;letter-spacing:.3px;}
+.datacell .val.small{font-size:11px;font-weight:500;}
+#resultsDrawer .datagrid{gap:6px 7px;}

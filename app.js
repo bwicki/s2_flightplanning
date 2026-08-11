@@ -507,7 +507,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.14.0 · 2026-08-10';
+const APP_VERSION = 'v1.15.0 · 2026-08-10';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -823,23 +823,39 @@ async function runCalculation() {
 
 function fmtDuration(sec) {
   const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
-  return `${h}h ${String(m).padStart(2, '0')}m`;
+  return { num: `${h} h ${String(m).padStart(2, '0')} min`, unit: '' };
+}
+
+// Every result value gets an explicit unit, rendered as number + muted unit tag
+function setVal(id, num, unit) {
+  const el = $(id);
+  if (!el) return;
+  el.innerHTML = '';
+  el.appendChild(document.createTextNode(num));
+  if (unit) {
+    const u = document.createElement('span');
+    u.className = 'unit';
+    u.textContent = unit;
+    el.appendChild(u);
+  }
 }
 
 function renderResults(r) {
-  $('resPressure').textContent = `${(r.P0 / 100).toFixed(1)} hPa`;
-  $('resGrossLift').textContent = `${(r.grossLiftKg * 1000).toFixed(1)} g`;
-  $('resNetLift').textContent = `${(r.netLiftKg * 1000).toFixed(1)} g`;
-  $('resGasVolume').textContent = `${r.V0.toFixed(3)} m³`;
-  const diam = Math.cbrt((6 * r.V0) / Math.PI);
-  $('resDiameter').textContent = `${diam.toFixed(2)} m`;
-  $('resBurstAlt').textContent = r.burstAlt ? `${Math.round(r.burstAlt).toLocaleString()} m AMSL` : 'not reached ≤45 km';
-  $('resAscentTime').textContent = fmtDuration(r.ascentTimeSec);
-  $('resFlightTime').textContent = fmtDuration(r.traj.totalTimeSec);
-  $('resDistance').textContent = `${(r.distanceM / 1000).toFixed(1)} km`;
-  $('resTropopause').textContent = r.tropopauseAlt
-    ? `${Math.round(r.tropopauseAlt).toLocaleString()} m AMSL`
-    : 'not detectable from levels';
+  setVal('resPressure', (r.P0 / 100).toFixed(1), 'hPa');
+  setVal('resGrossLift', (r.grossLiftKg * 1000).toFixed(1), 'g');
+  setVal('resNetLift', (r.netLiftKg * 1000).toFixed(1), 'g');
+  setVal('resGasVolume', r.V0.toFixed(3), 'm³');
+  const diam = Math.cbrt(6 * r.V0 / Math.PI);
+  setVal('resDiameter', diam.toFixed(2), 'm');
+  if (r.burstAlt) setVal('resBurstAlt', Math.round(r.burstAlt).toLocaleString('de-CH'), 'm AMSL');
+  else setVal('resBurstAlt', 'not reached', '≤ 45 km');
+  const at = fmtDuration(r.ascentTimeSec);
+  setVal('resAscentTime', at.num, at.unit);
+  const ft = fmtDuration(r.traj.totalTimeSec);
+  setVal('resFlightTime', ft.num, ft.unit);
+  setVal('resDistance', (r.distanceM / 1000).toFixed(1), 'km');
+  if (r.tropopauseAlt) setVal('resTropopause', Math.round(r.tropopauseAlt).toLocaleString('de-CH'), 'm AMSL');
+  else setVal('resTropopause', 'not detectable', 'from levels');
   $('resWeatherSource').textContent = `Open-Meteo ${r.weather.isArchive ? '(historical archive)' : '(forecast)'} — model: ${r.weather.modelUsed} — matched: ${r.weather.matchedTime} UTC`;
   if (r.note) $('calcError').textContent = r.note;
 }
