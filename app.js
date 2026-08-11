@@ -527,7 +527,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.23.0 · 2026-08-10';
+const APP_VERSION = 'v1.24.0 · 2026-08-10';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -820,6 +820,8 @@ async function runCalculation() {
   if (drawer) drawer.classList.add('collapsed');
   const dh = $('drawerHandle');
   if (dh) dh.classList.add('closed');
+  const rb0 = $('releaseSliderBox');
+  if (rb0) rb0.classList.add('closed');
   setStatus('Fetching weather…', 'wind + pressure levels');
   try {
     const lat = parseFloat($('launchLat').value);
@@ -1215,6 +1217,19 @@ function updateWxChip(usedSlug, opts) {
   if (subEl) subEl.textContent = 'tap to change';
 }
 
+
+// Re-run the existing prediction (forward or backward) after a parameter change
+// from the release-altitude slider. Does nothing if no trajectory exists yet.
+function recalcExistingTrajectory() {
+  if (state.busy || !state.trajectoryLine) return;
+  if (currentMode() === 'backward' && state.targetMarker) {
+    const ll = state.targetMarker.getLatLng();
+    reverseCalcFromLanding(ll.lat, ll.lng).catch(showError);
+  } else {
+    runCalculation().catch(showError);
+  }
+}
+
 function wireUI() {
   on('sondeType', 'change', e => {
     const w = e.target.selectedOptions[0].dataset.weight;
@@ -1269,6 +1284,8 @@ function wireUI() {
     if (open === undefined) open = d.classList.contains('collapsed');
     d.classList.toggle('collapsed', !open);
     if (h) h.classList.toggle('closed', !open);
+    const rb = $('releaseSliderBox');
+    if (rb) rb.classList.toggle('closed', !open);
     setTimeout(() => { if (state.map) state.map.invalidateSize(); }, 280);
   };
   const mainMenu = () => $('mainMenu');
@@ -1289,8 +1306,38 @@ function wireUI() {
   on('menuResultsBtn', 'click', () => { toggleResults(); const m = mainMenu(); if (m) { m.hidden = true; m.classList.remove('open'); } });
   on('menuCloseBtn', 'click', () => toggleDrawer(false));
   on('drawerHandle', 'click', () => toggleDrawer());
-  // Open the parameters drawer on first load so the user sees the settings once.
+  // Open the parameters drawer on first load so the user sees the settings once,
+  // and pulse the release-altitude group until the user touches it.
   toggleDrawer(true);
+  const relGroup = $('releaseGroup');
+  if (relGroup) relGroup.classList.add('release-pulse');
+  const dismissReleaseHint = () => { if (relGroup) relGroup.classList.remove('release-pulse'); };
+
+  // Release-altitude slider (below the green handle), two-way synced with the input
+  const relSlider = $('sReleaseAlt');
+  const relLbl = $('lblReleaseAlt');
+  const setRelLbl = v => { if (relLbl) relLbl.textContent = `${Math.round(v)} m`; };
+  const syncSliderFromInput = () => {
+    if (!relSlider) return;
+    const v = parseFloat($('targetAltitude').value);
+    if (!isNaN(v)) { relSlider.value = Math.min(7000, Math.max(500, v)); setRelLbl(relSlider.value); }
+  };
+  syncSliderFromInput();
+  if (relSlider) {
+    relSlider.addEventListener('input', () => {
+      setRelLbl(relSlider.value);
+      $('targetAltitude').value = relSlider.value;
+      dismissReleaseHint();
+    });
+    relSlider.addEventListener('change', () => {
+      $('targetAltitude').value = relSlider.value;
+      $('targetMode').value = 'altitude';
+      dismissReleaseHint();
+      recalcExistingTrajectory();
+    });
+  }
+  on('targetAltitude', 'change', () => { syncSliderFromInput(); dismissReleaseHint(); });
+  on('targetMode', 'change', dismissReleaseHint);
 
   // Weather model chip + popover (cockpit idiom), synced to hidden select
   // Full Open-Meteo model catalogue (forecast API `models=` strings).

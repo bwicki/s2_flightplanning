@@ -51,7 +51,7 @@
 </script>
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=23">
+<link rel="stylesheet" href="style.css?v=24">
 </head>
 <body>
 <div id="app">
@@ -151,6 +151,13 @@
 
     <div id="drawerHandle" class="side-handle handle-params" title="Show / hide flight settings"><span class="hbadge">1</span><span class="hlbl">Flight settings</span></div>
 
+    <div id="releaseSliderBox" title="Release altitude">
+      <div class="slider-row">
+        <div class="lbl"><span>Release altitude</span><b id="lblReleaseAlt">3800 m</b></div>
+        <input type="range" id="sReleaseAlt" min="500" max="7000" step="250" value="3800">
+      </div>
+    </div>
+
     <!-- ============ SETTINGS DRAWER (right) ============ -->
     <div id="menuDrawer">
       <div class="drawer-head">
@@ -169,11 +176,11 @@
                 <option value="custom" data-weight="9">Custom…</option>
               </select>
             </div>
-            <div class="fcell"><label for="sondeWeight">Sonde (g)</label>
-              <input type="number" id="sondeWeight" value="9" min="1" step="0.5">
+            <div class="fcell"><label for="sondeWeight">Sonde weight</label>
+              <div class="iwrap"><input type="number" id="sondeWeight" value="9" min="1" step="0.5"><span class="iunit">g</span></div>
             </div>
-            <div class="fcell"><label for="riggingWeight">Rigging (g)</label>
-              <input type="number" id="riggingWeight" value="5" min="0" step="0.5">
+            <div class="fcell"><label for="riggingWeight">Rigging etc.</label>
+              <div class="iwrap"><input type="number" id="riggingWeight" value="5" min="0" step="0.5"><span class="iunit">g</span></div>
             </div>
           </div>
         </div>
@@ -189,8 +196,8 @@
                 <option value="custom" data-lift="0.90">Custom…</option>
               </select>
             </div>
-            <div class="fcell"><label for="gasLift">Lift (kg/m³ @SL)</label>
-              <input type="number" id="gasLift" value="0.90" min="0.1" step="0.01">
+            <div class="fcell"><label for="gasLift">Lift @SL</label>
+              <div class="iwrap"><input type="number" id="gasLift" value="0.90" min="0.1" step="0.01"><span class="iunit">kg/m³</span></div>
             </div>
           </div>
         </div>
@@ -217,11 +224,11 @@
                 <button type="button" id="presetCancelBtn" class="ghost">✕</button>
               </div>
             </div>
-            <div class="fcell"><label for="balloonWeight">Balloon (g)</label>
-              <input type="number" id="balloonWeight" value="9" min="1" step="1">
+            <div class="fcell"><label for="balloonWeight">Balloon weight</label>
+              <div class="iwrap"><input type="number" id="balloonWeight" value="9" min="1" step="1"><span class="iunit">g</span></div>
             </div>
-            <div class="fcell"><label for="burstDiameterOverride">Burst Ø ovr. (m)</label>
-              <input type="number" id="burstDiameterOverride" placeholder="auto" min="0.1" step="0.01">
+            <div class="fcell"><label for="burstDiameterOverride">Burst Ø override</label>
+              <div class="iwrap"><input type="number" id="burstDiameterOverride" placeholder="auto" min="0.1" step="0.01"><span class="iunit">m</span></div>
             </div>
             <div class="fcell span2 hintcell"><label>Estimate</label><span class="hint" id="burstDiameterHint"></span></div>
           </div>
@@ -238,10 +245,10 @@
               </div>
             </div>
             <div class="fcell"><label for="launchLat">Latitude</label>
-              <input type="number" id="launchLat" value="47.3769" step="0.0001">
+              <div class="iwrap"><input type="number" id="launchLat" value="47.3769" step="0.0001"><span class="iunit">°N</span></div>
             </div>
             <div class="fcell"><label for="launchLon">Longitude</label>
-              <input type="number" id="launchLon" value="8.5417" step="0.0001">
+              <div class="iwrap"><input type="number" id="launchLon" value="8.5417" step="0.0001"><span class="iunit">°E</span></div>
             </div>
             <div class="fcell span2 statuscell"><div class="status-box" id="searchStatus"></div></div>
             <div class="fcell"><label for="launchDate">Date (UTC)</label>
@@ -256,14 +263,16 @@
         <div class="card wide2">
           <h3>05 · Flight profile <span class="chev">▾</span></h3>
           <div class="cardbody cellgrid cols4">
-            <div class="fcell"><label for="targetMode">Ascent target</label>
-              <select id="targetMode">
-                <option value="altitude" selected>Fixed altitude</option>
-                <option value="burst">To burst height</option>
-              </select>
-            </div>
-            <div class="fcell" id="targetAltitudeWrap"><label for="targetAltitude">Release (m AMSL)</label>
-              <input type="number" id="targetAltitude" value="5500" min="100" step="100">
+            <div class="fcell-pair span2" id="releaseGroup">
+              <div class="fcell"><label for="targetMode">Ascent target</label>
+                <select id="targetMode">
+                  <option value="altitude" selected>Fixed altitude</option>
+                  <option value="burst">To burst height</option>
+                </select>
+              </div>
+              <div class="fcell" id="targetAltitudeWrap"><label for="targetAltitude">Release altitude</label>
+                <div class="iwrap"><input type="number" id="targetAltitude" value="3800" min="500" max="7000" step="250"><span class="iunit">m AMSL</span></div>
+              </div>
             </div>
             <div class="fcell"><label for="ascentRate">Ascent rate</label>
               <select id="ascentRate">
@@ -276,8 +285,8 @@
                 <option value="4.0">4.0 m/s</option>
               </select>
             </div>
-            <div class="fcell"><label for="descentRate">Descent (m/s @SL)</label>
-              <input type="number" id="descentRate" value="5" min="1" max="15" step="0.5">
+            <div class="fcell"><label for="descentRate">Descent rate @SL</label>
+              <div class="iwrap"><input type="number" id="descentRate" value="5" min="1" max="15" step="0.5"><span class="iunit">m/s</span></div>
             </div>
           </div>
         </div>
@@ -297,6 +306,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=23"></script>
+<script src="app.js?v=24"></script>
 </body>
 </html>
