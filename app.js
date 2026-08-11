@@ -530,7 +530,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.35.0 · 2026-08-10';
+const APP_VERSION = 'v1.37.0 · 2026-08-10';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -1435,10 +1435,22 @@ function geomContains(lat, lon, geometry) {
 }
 
 // ---- overlay rendering for the current map view ----
+function airspaceVisible() {
+  try { return localStorage.getItem('sfp_airspace_show') !== '0'; } catch (e) { return true; }
+}
+function renderAirspaceToggle() {
+  const b = $('airspaceToggleBtn');
+  if (!b) return;
+  const on = airspaceVisible();
+  b.classList.toggle('on', on);
+  b.setAttribute('aria-pressed', on ? 'true' : 'false');
+}
+
 async function refreshAirspaceOverlay() {
   const types = enabledAsTypes();
   if (state.airspaceLayer) { state.map.removeLayer(state.airspaceLayer); state.airspaceLayer = null; }
   state.airspacePolys = [];
+  if (!airspaceVisible()) return;
   if (types.size === 0) return;
   if (state.map.getZoom() < 7) { setStatus('Airspace overlay', 'zoom in to load airspaces'); return; }
   const b = state.map.getBounds();
@@ -1612,6 +1624,10 @@ function wireUI() {
   });
   on('menuParamsBtn', 'click', () => { toggleDrawer(); const m = mainMenu(); if (m) { m.hidden = true; m.classList.remove('open'); } });
   on('menuResultsBtn', 'click', () => { toggleResults(); const m = mainMenu(); if (m) { m.hidden = true; m.classList.remove('open'); } });
+  on('menuAboutBtn', 'click', () => {
+    const m = mainMenu(); if (m) { m.hidden = true; m.classList.remove('open'); }
+    window.open('readme.pdf', '_blank', 'noopener');
+  });
   on('menuCloseBtn', 'click', () => toggleDrawer(false));
   on('drawerHandle', 'click', () => toggleDrawer());
   // Open the parameters drawer on first load so the user sees the settings once,
@@ -1831,6 +1847,13 @@ function wireUI() {
 
   // Airspace overlay controls
   buildAirspaceMenu();
+  renderAirspaceToggle();
+  on('airspaceToggleBtn', 'click', () => {
+    const next = !airspaceVisible();
+    try { localStorage.setItem('sfp_airspace_show', next ? '1' : '0'); } catch (e) { /* ignore */ }
+    renderAirspaceToggle();
+    refreshAirspaceOverlay();
+  });
   on('menuAirspaceBtn', 'click', () => {
     const m = mainMenu(); if (m) { m.hidden = true; m.classList.remove('open'); }
     const am = $('airspaceMenu');
