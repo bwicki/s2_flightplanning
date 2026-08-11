@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%230f8f86'/%3E%3Cpath d='M3 13.5 Q6 8 7.5 5' fill='none' stroke='%23ffffff' stroke-width='1.7' stroke-linecap='round'/%3E%3Ccircle cx='9' cy='4.5' r='2.4' fill='%23ffb454'/%3E%3Ccircle cx='12' cy='10' r='1.8' fill='%23ffb454'/%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2.5 13.5 Q5.5 8 7.5 4.5' fill='none' stroke='%230f8f86' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='9.5' cy='4' r='2.7' fill='%23ffb454' stroke='%2316202a' stroke-width='0.7'/%3E%3Ccircle cx='12.5' cy='10' r='2' fill='%230f8f86'/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="mask-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%230f8f86'/%3E%3Cpath d='M12 88 Q26 50 44 32' fill='none' stroke='%23ffffff' stroke-width='6' stroke-linecap='round'/%3E%3Cpath d='M58 40 Q72 58 84 86' fill='none' stroke='%23ffffff' stroke-width='4' stroke-linecap='round' stroke-dasharray='1 9'/%3E%3Ccircle cx='12' cy='88' r='6' fill='%23ffffff'/%3E%3Cpath d='M50 12 L53 22 L62 17 L58 27 L68 30 L58 33 L62 43 L53 38 L50 48 L47 38 L38 43 L42 33 L32 30 L42 27 L38 17 L47 22 Z' fill='%23ffb454'/%3E%3Cpath d='M66 58 A11 9 0 0 1 88 58 Z' fill='%23ffb454'/%3E%3Cline x1='67' y1='59' x2='75' y2='72' stroke='%23ffb454' stroke-width='2'/%3E%3Cline x1='87' y1='59' x2='79' y2='72' stroke='%23ffb454' stroke-width='2'/%3E%3Crect x='73' y='72' width='8' height='7' rx='1.5' fill='%23ffffff'/%3E%3C/svg%3E" color="#0f8f86">
+<link rel="mask-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M12 88 Q26 50 44 32' fill='none' stroke='%230f8f86' stroke-width='7' stroke-linecap='round'/%3E%3Cpath d='M58 40 Q72 58 84 86' fill='none' stroke='%230f8f86' stroke-width='4.5' stroke-linecap='round' stroke-dasharray='1 9'/%3E%3Ccircle cx='12' cy='88' r='6.5' fill='%230f8f86'/%3E%3Cpath d='M50 12 L53 22 L62 17 L58 27 L68 30 L58 33 L62 43 L53 38 L50 48 L47 38 L38 43 L42 33 L32 30 L42 27 L38 17 L47 22 Z' fill='%23ffb454' stroke='%2316202a' stroke-width='1.5'/%3E%3Cpath d='M66 58 A11 9 0 0 1 88 58 Z' fill='%23ffb454' stroke='%2316202a' stroke-width='1'/%3E%3Cline x1='67' y1='59' x2='75' y2='72' stroke='%23ffb454' stroke-width='2.2'/%3E%3Cline x1='87' y1='59' x2='79' y2='72' stroke='%23ffb454' stroke-width='2.2'/%3E%3Crect x='73' y='72' width='8' height='7' rx='1.5' fill='%230f8f86'/%3E%3C/svg%3E" color="#0f8f86">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -51,14 +51,19 @@
 </script>
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=17">
+<link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
 <div id="app">
 
   <!-- ================= TOPBAR ================= -->
   <div id="topbar">
-    <button type="button" id="menuBtn" class="iconbtn" title="Settings menu" aria-label="Open settings menu">☰</button>
+    <button type="button" id="menuBtn" class="iconbtn" title="Menu" aria-label="Open menu">☰</button>
+    <div id="mainMenu" class="top-popover">
+      <button type="button" id="menuParamsBtn"><span><span class="mbadge green">1</span> Parameters</span></button>
+      <button type="button" id="menuResultsBtn"><span><span class="mbadge amber">2</span> Resulting flight data</span></button>
+      <button type="button" id="themeToggle"><span>◐ Day / night</span></button>
+    </div>
     <span class="title">SONDE FLIGHT PLANNING</span>
     <div class="sep"></div>
 
@@ -93,11 +98,11 @@
       <span title="Burst / release"><svg width="14" height="14" viewBox="0 0 30 30"><path d="M15 2 L18 10 L26 6 L21 13 L29 15 L21 17 L26 24 L18 20 L15 28 L12 20 L4 24 L9 17 L1 15 L9 13 L4 6 L12 10 Z" fill="#ffb454" stroke="#0a0d10" stroke-width="1"/><circle cx="15" cy="15" r="3" fill="#e0483f"/></svg>Burst</span>
       <span title="Landing"><svg width="14" height="14" viewBox="0 0 30 30"><path d="M4 13 A11 9 0 0 1 26 13 L15 13 Z" fill="#e0483f" stroke="#fff" stroke-width="1.5"/><line x1="5" y1="13" x2="15" y2="25" stroke="#fff" stroke-width="1.2"/><line x1="25" y1="13" x2="15" y2="25" stroke="#fff" stroke-width="1.2"/><circle cx="15" cy="26" r="2.4" fill="#e0483f" stroke="#fff" stroke-width="1"/></svg>Landing</span>
     </div>
+    <div class="sep"></div>
+    <div class="wx-chip status" id="statusChip"><b id="statusLine">Ready</b><span id="statusSub">open ☰ or click the map</span></div>
+
 
     <div class="spacer"></div>
-    <div class="wx-chip status" id="statusChip"><b id="statusLine">Ready</b><span id="statusSub">open ☰ to set parameters</span></div>
-    <button type="button" id="resultsOpenBtn" class="iconbtn" hidden title="Show results">📊</button>
-    <button type="button" id="themeToggle" class="iconbtn" title="Toggle day / night theme">◐</button>
     <span class="logo-chip"><img src="https://static1.squarespace.com/static/5c603f6f7eb88c2edd690e48/t/5ccdb9f051e58c0001e89503/1556986355383/17_03_17_Wicki_Ballonteam_Logo_RZ.png?format=300w" alt="Wicki Partners Ballonteam" title="Wicki Partners Ballonteam"></span>
   </div>
 
@@ -292,6 +297,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=17"></script>
+<script src="app.js?v=20"></script>
 </body>
 </html>

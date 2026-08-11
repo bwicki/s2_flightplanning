@@ -507,7 +507,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.17.0 · 2026-08-10';
+const APP_VERSION = 'v1.20.0 · 2026-08-10';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -546,7 +546,7 @@ function initMap() {
 
   // Version badge bottom-left (cockpit idiom)
   const vc = $('versionChip');
-  if (vc) vc.textContent = `Sonde Flight Planning ${APP_VERSION}`;
+  if (vc) vc.textContent = APP_VERSION;
 
   // Base layers + always-visible radio control, top-right (cockpit idiom)
   const baseLayers = {
@@ -645,7 +645,7 @@ function applyTheme(theme) {
   document.body.classList.toggle('day', theme === 'light');
   document.documentElement.setAttribute('data-theme', theme);
   const btn = $('themeToggle');
-  if (btn) btn.textContent = theme === 'light' ? '◑' : '◐';
+  if (btn) btn.innerHTML = theme === 'light' ? '<span>◑ Switch to night mode</span>' : '<span>◐ Switch to day mode</span>';
   try { localStorage.setItem('sfp_theme', theme); } catch (e) { /* ignore */ }
 }
 
@@ -699,8 +699,6 @@ function openResults() {
   if (h) h.classList.remove('closed');
   const mw = $('mapwrap');
   if (mw) mw.classList.add('results-open');
-  const fab = $('resultsOpenBtn');
-  if (fab) fab.hidden = false;
 }
 function closeResults() {
   const d = $('resultsDrawer');
@@ -813,8 +811,9 @@ async function runCalculation() {
     drawProfile(r.traj);
     openResults();
     setTimeout(fitFlightPath, 320);
+    updateWxChip(r.weather.modelUsed);
     const wxSub = $('wxModelSub');
-    if (wxSub) wxSub.textContent = `wx ${r.weather.matchedTime} UTC`;
+    if (wxSub && wxSub.textContent === 'tap to change') wxSub.textContent = `wx ${r.weather.matchedTime} UTC`;
     setStatus(r.note ? 'Note — see form' : 'Calculation complete', `wx: ${r.weather.matchedTime} UTC`);
   } finally {
     state.busy = false;
@@ -1093,6 +1092,7 @@ function gatherInputs() {
 
 function applyInputs(inputs) {
   Object.entries(inputs).forEach(([k, v]) => { if ($(k) && v != null) $(k).value = v; });
+  updateWxChip();
   $('targetAltitudeWrap').style.display = $('targetMode').value === 'altitude' ? '' : 'none';
   if (state.map) {
     const la = parseFloat(inputs.launchLat), lo = parseFloat(inputs.launchLon);
@@ -1162,6 +1162,32 @@ function on(id, event, handler) {
   else console.warn('Missing element:', id);
 }
 
+
+// Reflect the effective weather model in the header chip.
+// selectedValue = value of the hidden select; usedSlug (optional) = what the
+// calculation actually used (differs from selection after a fallback).
+function updateWxChip(usedSlug) {
+  const nameEl = $('wxModelName');
+  const subEl = $('wxModelSub');
+  if (!nameEl) return;
+  const models = window.__wxModels || [];
+  const sel = $('weatherModel') ? $('weatherModel').value : '';
+  const labelFor = v => {
+    const m = models.find(mm => !mm.group && mm.v === v);
+    return m ? m.label : v;
+  };
+  if (usedSlug !== undefined && usedSlug !== null) {
+    const usedVal = usedSlug.startsWith('best_match') ? '' : usedSlug;
+    if (usedVal !== sel) {
+      nameEl.textContent = labelFor(usedVal) + '';
+      if (subEl) subEl.textContent = 'fallback — ' + (sel ? labelFor(sel) : 'auto') + ' unavailable';
+      return;
+    }
+  }
+  nameEl.textContent = sel ? labelFor(sel) : 'Best match (auto)';
+  if (subEl) subEl.textContent = 'tap to change';
+}
+
 function wireUI() {
   on('sondeType', 'change', e => {
     const w = e.target.selectedOptions[0].dataset.weight;
@@ -1205,7 +1231,6 @@ function wireUI() {
 
   // Results drawer controls (left)
   on('resultsCloseBtn', 'click', closeResults);
-  on('resultsOpenBtn', 'click', toggleResults);
   on('resultsHandle', 'click', toggleResults);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeResults(); });
 
@@ -1219,10 +1244,21 @@ function wireUI() {
     if (h) h.classList.toggle('closed', !open);
     setTimeout(() => { if (state.map) state.map.invalidateSize(); }, 280);
   };
-  on('menuBtn', 'click', () => toggleDrawer());
+  const mainMenu = () => $('mainMenu');
+  on('menuBtn', 'click', (e) => {
+    const m = mainMenu();
+    if (m) m.classList.toggle('open');
+    e.stopPropagation();
+  });
+  document.addEventListener('click', (e) => {
+    const m = mainMenu();
+    if (m && m.classList.contains('open') && !m.contains(e.target) && !e.target.closest('#menuBtn')) m.classList.remove('open');
+  });
+  on('menuParamsBtn', 'click', () => { toggleDrawer(); const m = mainMenu(); if (m) m.classList.remove('open'); });
+  on('menuResultsBtn', 'click', () => { toggleResults(); const m = mainMenu(); if (m) m.classList.remove('open'); });
   on('menuCloseBtn', 'click', () => toggleDrawer(false));
   on('drawerHandle', 'click', () => toggleDrawer());
-  // Open drawer on first load so the user sees the settings once.
+  // Open the parameters drawer on first load so the user sees the settings once.
   toggleDrawer(true);
 
   // Weather model chip + popover (cockpit idiom), synced to hidden select
@@ -1273,6 +1309,7 @@ function wireUI() {
     { v: 'gem_hrdps_continental', label: 'GEM HRDPS 2.5 km (Canada)' },
     { v: 'jma_msm', label: 'JMA MSM 5 km (Japan)' },
   ];
+  window.__wxModels = wxModels;
   function syncWxSelect() {
     const sel = $('weatherModel');
     if (!sel) return;
@@ -1306,16 +1343,14 @@ function wireUI() {
       if (m.v === cur) b.classList.add('active');
       b.addEventListener('click', () => {
         $('weatherModel').value = m.v;
-        const nameEl = $('wxModelName');
-        if (nameEl) nameEl.textContent = m.v ? m.label : 'Best match';
-        const subEl = $('wxModelSub');
-        if (subEl) subEl.textContent = 'tap to change';
+        updateWxChip();
         pop.classList.remove('open');
       });
       pop.appendChild(b);
     });
   }
   syncWxSelect();
+  updateWxChip();
   on("wxModelChip", "click", (e) => {
     const pop = $('wxModelPopover');
     if (!pop) return;
