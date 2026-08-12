@@ -550,7 +550,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.46.0 · 2026-08-11';
+const APP_VERSION = 'v1.47.0 · 2026-08-11';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -1468,10 +1468,12 @@ async function fetchAirspaces(bbox) {
   const url = `https://api.core.openaip.net/api/airspaces?apiKey=${encodeURIComponent(key)}&bbox=${bbox.join(',')}&limit=1000`;
   // The OpenAIP core API sends no CORS headers, so a direct browser fetch is
   // blocked. Try direct first (in case that changes), then public CORS relays.
+  // Relays first: the direct call is CORS-blocked in browsers today and only
+  // kept as a last resort in case OpenAIP ever enables CORS.
   const candidates = [
-    url,
     `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
     `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    url,
   ];
   let data = null, lastErr = null;
   for (const u of candidates) {
@@ -1723,8 +1725,11 @@ function buildGmapsTrajUrl() {
 }
 
 function updateGmapsBtn() {
+  const show = !!buildGmapsTrajUrl();
   const b = $('gmapsTrajBtn');
-  if (b) b.hidden = !buildGmapsTrajUrl();
+  if (b) b.hidden = !show;
+  const sep = $('gmapsSep');
+  if (sep) sep.hidden = !show;
 }
 
 function wireUI() {
@@ -2064,31 +2069,41 @@ function wireUI() {
   refreshAirspaceOverlay();
 
 
-  // G2: trajectory -> Google Maps (text opens the route, QR icon opens/closes the popover)
+  // G2: trajectory -> Google Maps (button text opens the route, QR icon toggles the popover)
   const gmPop = () => $('gmapsQrPop');
   const closeGmPop = () => { const p = gmPop(); if (p) { p.hidden = true; p.classList.remove('open'); } };
+  const openGmQr = () => {
+    const url = buildGmapsTrajUrl();
+    const p = gmPop();
+    if (!url || !p) return;
+    if (!p.hidden) { closeGmPop(); return; }
+    const box = $('gmapsQrBox');
+    if (box) {
+      try {
+        if (typeof qrcode === 'function') {
+          const q = qrcode(0, 'M');
+          q.addData(url);
+          q.make();
+          box.innerHTML = q.createSvgTag({ cellSize: 4, margin: 0 });
+        } else {
+          box.innerHTML = '<p class="hint">QR library not loaded — use the button text to open the link.</p>';
+        }
+      } catch (err) {
+        box.innerHTML = '<p class="hint">QR generation failed.</p>';
+      }
+    }
+    p.hidden = false;
+    p.classList.add('open');
+  };
+  const qrIcon = document.getElementById('gmapsQrIcon');
+  if (qrIcon) qrIcon.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); openGmQr(); });
   on('gmapsTrajBtn', 'click', (e) => {
+    if (e.target.closest && e.target.closest('#gmapsQrIcon')) return; // handled above
     const url = buildGmapsTrajUrl();
     if (!url) return;
-    if (e.target.closest('#gmapsQrIcon')) {
-      const p = gmPop();
-      if (!p) return;
-      if (!p.hidden) { closeGmPop(); return; }
-      const box = $('gmapsQrBox');
-      if (box && typeof qrcode === 'function') {
-        const q = qrcode(0, 'M');
-        q.addData(url);
-        q.make();
-        box.innerHTML = q.createSvgTag({ cellSize: 4, margin: 0 });
-      } else if (box) {
-        box.innerHTML = '<p class="hint">QR library not loaded — use the button text to open the link.</p>';
-      }
-      p.hidden = false;
-      p.classList.add('open');
-    } else {
-      closeGmPop();
-      window.open(url, '_blank', 'noopener');
-    }
+    closeGmPop();
+    const w = window.open(url, '_blank', 'noopener');
+    if (!w) setStatus('Pop-up blocked', 'allow pop-ups to open Google Maps');
     e.stopPropagation();
   });
   on('gmapsQrCloseBtn', 'click', closeGmPop);

@@ -35,7 +35,7 @@
     if(e.target && (e.target.tagName==='SCRIPT'||e.target.tagName==='LINK')){
       show('Failed to load resource: '+(e.target.src||e.target.href||'?')+' \u2014 check network / content blocker');
     }else{
-      show((e.message||'unknown')+(e.filename?' @ '+e.filename.split('/').pop()+':'+e.lineno:''));
+      show((e.message||(e.error&&e.error.message)||'unknown')+(e.filename?' @ '+e.filename.split('/').pop()+':'+e.lineno:''));
     }
   },true);
   window.addEventListener('unhandledrejection',function(e){
@@ -51,8 +51,8 @@
 </script>
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=46">
-  <script defer src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<link rel="stylesheet" href="style.css?v=47">
+  <script defer src="qrcode.js?v=1"></script>
 </head>
 <body>
 <div id="app">
@@ -97,7 +97,7 @@
       <span>Airspace</span>
       <span class="as-seg"><span class="as-on">on</span><span class="as-off">off</span></span>
     </button>
-    <div class="sep"></div>
+    <div class="sep" id="gmapsSep" hidden></div>
     <button type="button" id="gmapsTrajBtn" class="as-toggle gm-btn" hidden title="Open the trajectory as a route in Google Maps">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#e0483f" stroke-width="2" aria-hidden="true"><path d="M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/><path d="M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z"/></svg>
       <span>Traj → GMaps</span>
@@ -360,6 +360,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=46"></script>
+<script src="app.js?v=47"></script>
 </body>
 </html>
