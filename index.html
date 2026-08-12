@@ -51,7 +51,8 @@
 </script>
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=43">
+<link rel="stylesheet" href="style.css?v=46">
+  <script defer src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 </head>
 <body>
 <div id="app">
@@ -59,22 +60,14 @@
   <!-- ================= TOPBAR ================= -->
   <div id="topbar">
     <button type="button" id="menuBtn" class="iconbtn" title="Menu" aria-label="Open menu">☰</button>
-    <div id="mainMenu" class="top-popover" hidden>
-      <button type="button" id="menuParamsBtn"><span><span class="mbadge green">1</span> Flight settings</span></button>
-      <button type="button" id="menuResultsBtn"><span><span class="mbadge amber">2</span> Resulting flight data</span></button>
-      <button type="button" id="menuAirspaceBtn"><span>⬡ Airspace overlay…</span></button>
-      <button type="button" id="themeToggle"><span>◐ Day / night</span></button>
-      <button type="button" id="menuAboutBtn"><span>ⓘ About — read first!</span></button>
-    </div>
-    <span class="title">SONDE FLIGHT PLANNING</span>
     <div class="sep"></div>
 
     <div id="modeSwitch" class="mode-toggle" role="radiogroup" aria-label="Map click mode">
-      <label><input type="radio" name="searchMode" value="forward" checked><span class="mcard">
+      <label><input type="radio" name="searchMode" value="forward" checked><span class="mcard fwd">
         <svg class="micon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/><path d="M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z"/></svg>
         <span class="mtxt"><span class="mname">Forward</span><span class="msub">set launch</span></span>
       </span></label>
-      <label><input type="radio" name="searchMode" value="backward"><span class="mcard">
+      <label><input type="radio" name="searchMode" value="backward"><span class="mcard bwd">
         <svg class="micon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>
         <span class="mtxt"><span class="mname">Backward</span><span class="msub">set landing</span></span>
       </span></label>
@@ -88,7 +81,6 @@
       </div>
       <span id="wxModelSub">tap to change</span>
     </div>
-    <div id="wxModelPopover"></div>
     <select id="weatherModel" hidden>
       <option value="" selected>Best match (auto)</option>
       <option value="gfs_seamless">GFS (NOAA)</option>
@@ -100,17 +92,16 @@
       <option value="jma_seamless">JMA</option>
     </select>
     <div class="sep"></div>
-
-    <div class="legend-chips">
-      <span title="Launch"><svg width="14" height="14" viewBox="0 0 30 30"><ellipse cx="15" cy="10" rx="7" ry="8" fill="#4169e1" stroke="#fff" stroke-width="1.5"/><line x1="15" y1="18" x2="15" y2="24" stroke="#fff" stroke-width="1.5"/><rect x="12.8" y="24" width="4.4" height="3.6" rx="0.8" fill="#4169e1" stroke="#fff" stroke-width="1"/></svg>Launch</span>
-      <span title="Burst / release"><svg width="14" height="14" viewBox="0 0 30 30"><path d="M15 2 L18 10 L26 6 L21 13 L29 15 L21 17 L26 24 L18 20 L15 28 L12 20 L4 24 L9 17 L1 15 L9 13 L4 6 L12 10 Z" fill="#ffb454" stroke="#0a0d10" stroke-width="1"/><circle cx="15" cy="15" r="3" fill="#e0483f"/></svg>Burst</span>
-      <span title="Landing"><svg width="14" height="14" viewBox="0 0 30 30"><path d="M4 13 A11 9 0 0 1 26 13 L15 13 Z" fill="#e0483f" stroke="#fff" stroke-width="1.5"/><line x1="5" y1="13" x2="15" y2="25" stroke="#fff" stroke-width="1.2"/><line x1="25" y1="13" x2="15" y2="25" stroke="#fff" stroke-width="1.2"/><circle cx="15" cy="26" r="2.4" fill="#e0483f" stroke="#fff" stroke-width="1"/></svg>Landing</span>
-    </div>
-    <div class="sep"></div>
     <button type="button" id="airspaceToggleBtn" class="as-toggle" title="Show / hide the selected airspace overlay" aria-pressed="false">
       <svg class="as-hex" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2l8 5v10l-8 5-8-5V7z"/></svg>
       <span>Airspace</span>
       <span class="as-seg"><span class="as-on">on</span><span class="as-off">off</span></span>
+    </button>
+    <div class="sep"></div>
+    <button type="button" id="gmapsTrajBtn" class="as-toggle gm-btn" hidden title="Open the trajectory as a route in Google Maps">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#e0483f" stroke-width="2" aria-hidden="true"><path d="M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/><path d="M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z"/></svg>
+      <span>Traj → GMaps</span>
+      <svg id="gmapsQrIcon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-label="Show QR code" role="button"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM18 18h3v3h-3z"/></svg>
     </button>
     <div class="sep"></div>
     <div class="wx-chip status" id="statusChip"><b id="statusLine">Ready</b><span id="statusSub">open ☰ or click the map</span></div>
@@ -119,22 +110,42 @@
     <div class="spacer"></div>
     <span class="logo-chip"><img src="https://static1.squarespace.com/static/5c603f6f7eb88c2edd690e48/t/5ccdb9f051e58c0001e89503/1556986355383/17_03_17_Wicki_Ballonteam_Logo_RZ.png?format=300w" alt="Wicki Partners Ballonteam" title="Wicki Partners Ballonteam"></span>
   </div>
-
+    <div id="mainMenu" class="top-popover" hidden>
+      <button type="button" id="menuParamsBtn"><span><span class="mbadge green">1</span> Flight settings</span></button>
+      <button type="button" id="menuResultsBtn"><span><span class="mbadge amber">2</span> Resulting flight data</span></button>
+      <button type="button" id="menuAirspaceBtn"><span>⬡ Airspace overlay…</span></button>
+      <button type="button" id="themeToggle"><span>◐ Day / night</span></button>
+      <button type="button" id="menuAboutBtn"><span>ⓘ About — more info</span></button>
+    </div>
     <div id="airspaceMenu" class="top-popover as-menu" hidden>
       <div class="as-head">Airspace overlay <button type="button" id="airspaceCloseBtn" class="overlay-close">✕</button></div>
       <div class="as-rows" id="airspaceRows"></div>
       <p class="hint as-note">Approximate planning aid (OpenAIP community data). FL / AGL limits are approximated; NOTAM activations are not reflected. Always check DABS / NOTAM before launch.</p>
     </div>
+    <div id="wxModelPopover"></div>
+  <div id="gmapsQrPop" class="top-popover gm-pop" hidden>
+    <div class="as-head">Route → Google Maps <button type="button" id="gmapsQrCloseBtn" class="overlay-close">✕</button></div>
+    <div id="gmapsQrBox" class="gm-qr"></div>
+    <p class="hint gm-hint">Scan with a phone to open the trajectory as a waypoint route (launch → path → landing) in Google Maps.</p>
+  </div>
+
 
   <!-- ================= MAIN ================= -->
   <div id="main">
     <div id="mapwrap">
       <div id="map"></div>
       <div id="speedLegendBar" class="legend-bar">
-      <span class="gwl-title">Ground speed · km/h</span>
-      <span class="gwl-col">
-        <span class="gwl-grad"></span>
-        <span class="gwl-ticks"><span id="gwlMin">0</span><span id="gwlMid">25</span><span id="gwlMax">50</span></span>
+      <span class="lb-row lb-icons">
+        <svg width="11" height="11" viewBox="0 0 30 30" aria-hidden="true"><ellipse cx="15" cy="10" rx="7" ry="8" fill="#4169e1" stroke="#fff" stroke-width="1.5"/><line x1="15" y1="18" x2="15" y2="24" stroke="#fff" stroke-width="1.5"/><rect x="12.8" y="24" width="4.4" height="3.6" rx="0.8" fill="#4169e1" stroke="#fff" stroke-width="1"/></svg><span>Launch</span>
+        <svg width="11" height="11" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3 L17 10 L23 6 L20.5 12.5 L27 14.5 L20.5 16.5 L23 23 L17 19 L15 26 L13 19 L7 23 L9.5 16.5 L3 14.5 L9.5 12.5 L7 6 L13 10 Z" fill="#ffb454" stroke="#e0483f" stroke-width="1"/></svg><span>Burst</span>
+        <svg width="11" height="11" viewBox="0 0 30 30" aria-hidden="true"><path d="M6 13 A9.5 8 0 0 1 24 13 Z" fill="#e0483f" stroke="#fff" stroke-width="1"/><line x1="7" y1="14" x2="13" y2="22" stroke="#e0483f" stroke-width="1.4"/><line x1="23" y1="14" x2="17" y2="22" stroke="#e0483f" stroke-width="1.4"/><rect x="13" y="22" width="4" height="4" rx="0.8" fill="#e0483f"/></svg><span>Landing</span>
+      </span>
+      <span class="lb-row">
+        <span class="gwl-title">Ground speed · km/h</span>
+        <span class="gwl-col">
+          <span class="gwl-grad"></span>
+          <span class="gwl-ticks"><span id="gwlMin">0</span><span id="gwlMid">25</span><span id="gwlMax">50</span></span>
+        </span>
       </span>
     </div>
     <div id="versionChip" class="version-badge"></div>
@@ -349,6 +360,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=43"></script>
+<script src="app.js?v=46"></script>
 </body>
 </html>

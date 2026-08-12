@@ -241,6 +241,7 @@ async function fetchWeather(lat, lon, dateUTC, timeUTC, modelSlug) {
   return {
     elevation, surfacePressurePa, surfaceTempK, levels, tempLevels,
     matchedTime: data.hourly.time[idx],
+    loadedAt: new Date(),
     modelUsed: modelSlug || (isArchive ? 'era5' : 'best_match'),
     modelAuto,
     modelFellBack: fellBack,
@@ -514,9 +515,9 @@ const SIG_SVGS = {
     svg: `<svg width="30" height="30" viewBox="0 0 30 30"><circle cx="15" cy="15" r="9" fill="none" stroke="#b78cff" stroke-width="3"/><circle cx="15" cy="15" r="9" fill="rgba(183,140,255,0.15)"/><line x1="15" y1="1" x2="15" y2="8" stroke="#b78cff" stroke-width="3"/><line x1="15" y1="22" x2="15" y2="29" stroke="#b78cff" stroke-width="3"/><line x1="1" y1="15" x2="8" y2="15" stroke="#b78cff" stroke-width="3"/><line x1="22" y1="15" x2="29" y2="15" stroke="#b78cff" stroke-width="3"/><circle cx="15" cy="15" r="2.6" fill="#b78cff"/></svg>`,
     size: [30, 30], anchor: [15, 15],
   },
-  device: { // current device position
-    svg: `<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="8" fill="rgba(63,208,201,0.25)" stroke="#3fd0c9" stroke-width="2.5"/><circle cx="11" cy="11" r="3" fill="#3fd0c9"/></svg>`,
-    size: [22, 22], anchor: [11, 11],
+  device: { // current device position: pulsing ring + bold dot
+    html: `<div class="device-marker"><div class="dm-ring"></div><div class="dm-dot"></div></div>`,
+    size: [34, 34], anchor: [17, 17],
   },
 };
 
@@ -531,7 +532,17 @@ function sigIcon(kind) {
 }
 
 function sigMarker(lat, lon, kind) {
-  return L.marker([lat, lon], { icon: sigIcon(kind), zIndexOffset: kind === 'launch' ? 300 : 200 });
+  const s = SIG_SVGS[kind];
+  const m = L.marker([lat, lon], {
+    icon: L.divIcon({
+      className: 'sig-marker',
+      html: s.html || s.svg,
+      iconSize: s.size,
+      iconAnchor: s.anchor,
+    }),
+  });
+  if (kind === 'device') m.setZIndexOffset(1200);
+  return m;
 }
 
 function currentMode() {
@@ -539,7 +550,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.43.0 · 2026-08-11';
+const APP_VERSION = 'v1.46.0 · 2026-08-11';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -609,6 +620,16 @@ function initMap() {
     }
   });
   state.map.addControl(new BaseLayerRadioControl());
+  state.setBaseLayer = (name) => {
+    if (!baseLayers[name] || name === activeBaseLayerName) return activeBaseLayerName;
+    const prev = activeBaseLayerName;
+    state.map.removeLayer(baseLayers[activeBaseLayerName]);
+    activeBaseLayerName = name;
+    baseLayers[name].addTo(state.map);
+    const r = document.querySelector(`.base-layer-radio input[value="${name}"]`);
+    if (r) r.checked = true;
+    return prev;
+  };
 
   state.launchMarker = sigMarker(parseFloat($('launchLat').value), parseFloat($('launchLon').value), 'launch').addTo(state.map);
   attachPointZoom(state.launchMarker, ll => `Launch site<br>${ll.lat.toFixed(4)}, ${ll.lng.toFixed(4)}`);
@@ -846,11 +867,13 @@ async function runCalculation() {
     openResults();
     setTimeout(fitFlightPath, 320);
     checkAirspaceViolations(r.traj).catch(() => {});
+    updateGmapsBtn();
     updateWxChip(r.weather.modelUsed, {
       auto: r.weather.modelAuto,
       fellBack: r.weather.modelFellBack,
       requested: $('weatherModel').value,
       time: r.weather.matchedTime,
+      loadedAt: r.weather.loadedAt,
     });
     setStatus(r.note ? 'Note — see form' : 'Calculation complete', `wx: ${r.weather.matchedTime} UTC`);
   } finally {
@@ -1231,6 +1254,7 @@ async function reverseCalcFromLanding(targetLat, targetLon) {
     openResults();
     setTimeout(fitFlightPath, 320);
     checkAirspaceViolations(result.traj).catch(() => {});
+    updateGmapsBtn();
 
     const finalErr = haversine(targetLat, targetLon, result.traj.landing.lat, result.traj.landing.lon);
     setStatus('Launch site back-solved', `landing ${(finalErr / 1000).toFixed(1)} km from target`);
@@ -1347,9 +1371,17 @@ function updateWxChip(usedSlug, opts) {
   if (usedSlug !== undefined && usedSlug !== null) {
     nameEl.textContent = labelFor(usedSlug);
     if (subEl) {
-      if (opts.fellBack) subEl.textContent = 'fallback — ' + labelFor(opts.requested || sel) + ' unavailable';
-      else if (opts.auto) subEl.textContent = 'auto-selected' + (opts.time ? ' · wx ' + opts.time + ' UTC' : '');
-      else subEl.textContent = opts.time ? 'wx ' + opts.time + ' UTC' : 'tap to change';
+      let info = '';
+      if (opts.time) {
+        const wxDate = new Date(opts.time + (opts.time.length === 16 ? ':00Z' : 'Z'));
+        const loaded = opts.loadedAt || new Date();
+        const p2 = x => String(x).padStart(2, '0');
+        const leadH = Math.round((wxDate - loaded) / 3600000);
+        info = `ld ${p2(loaded.getHours())}:${p2(loaded.getMinutes())} · wx ${leadH >= 0 ? '+' : ''}${leadH}h`;
+      }
+      if (opts.fellBack) subEl.textContent = 'fallback' + (info ? ' · ' + info : ' — retry');
+      else if (opts.auto) subEl.textContent = 'auto' + (info ? ' · ' + info : '');
+      else subEl.textContent = info || 'tap to change';
     }
     return;
   }
@@ -1426,7 +1458,12 @@ const asCache = new Map();
 async function fetchAirspaces(bbox) {
   const key = (asPrefs().key || OPENAIP_DEFAULT_KEY).trim();
   if (!key) return [];
-  const bkey = bbox.map(v => v.toFixed(2)).join(',');
+  // Quantize the bbox outward to a 0.2-degree grid: panning inside the same
+  // cell reuses the cache instead of firing a new (relay) request every time.
+  const q = 0.2;
+  bbox = [Math.floor(bbox[0] / q) * q, Math.floor(bbox[1] / q) * q,
+          Math.ceil(bbox[2] / q) * q, Math.ceil(bbox[3] / q) * q];
+  const bkey = bbox.map(v => v.toFixed(1)).join(',');
   if (asCache.has(bkey)) return asCache.get(bkey);
   const url = `https://api.core.openaip.net/api/airspaces?apiKey=${encodeURIComponent(key)}&bbox=${bbox.join(',')}&limit=1000`;
   // The OpenAIP core API sends no CORS headers, so a direct browser fetch is
@@ -1438,13 +1475,18 @@ async function fetchAirspaces(bbox) {
   ];
   let data = null, lastErr = null;
   for (const u of candidates) {
+    // Per-candidate timeout so a hanging relay falls through to the next one
+    // instead of failing the whole load (frequent on cellular iPads).
+    const ctl = ('AbortController' in window) ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), 9000) : null;
     try {
-      const res = await fetch(u);
+      const res = await fetch(u, ctl ? { signal: ctl.signal } : undefined);
       if (!res.ok) { lastErr = new Error(`Airspace request failed (${res.status})`); continue; }
       data = await res.json();
       if (data && data.items) break;
       data = null;
     } catch (e) { lastErr = e; }
+    finally { if (timer) clearTimeout(timer); }
   }
   if (!data) throw (lastErr || new Error('Airspace request failed'));
   const items = data.items || [];
@@ -1596,6 +1638,95 @@ function buildAirspaceMenu() {
   });
 }
 
+
+// Single-page A4-landscape print report: plan data | street map with the whole
+// trajectory | result data. Temporarily switches to Streets, fits the path,
+// snapshots the map via html2canvas, then opens a print window.
+async function printFlightReport() {
+  if (state.busy) return;
+  const rows = sel => [...document.querySelectorAll(sel)].map(cell => {
+    const lab = cell.querySelector('label');
+    const inp = cell.querySelector('input, select');
+    const val = cell.querySelector('.val');
+    let v = '';
+    if (inp) {
+      v = inp.tagName === 'SELECT' ? (inp.selectedOptions[0] ? inp.selectedOptions[0].textContent : inp.value) : inp.value;
+      const u = cell.querySelector('.iunit');
+      if (u) v += ' ' + u.textContent;
+    } else if (val) v = val.textContent;
+    return lab && v ? [lab.textContent, v] : null;
+  }).filter(Boolean);
+
+  const planRows = rows('#menuDrawer .fcell');
+  const resRows = rows('#resultsDrawer .datacell');
+
+  // Map snapshot: Streets layer, whole trajectory in view, no drawer padding
+  let mapImg = null;
+  const prevBase = state.setBaseLayer ? state.setBaseLayer('Streets') : null;
+  try {
+    if (state.trajectoryLine) {
+      state.map.fitBounds(state.trajectoryLine.getBounds(), { padding: [30, 30], animate: false });
+    }
+    await new Promise(r => setTimeout(r, 900)); // let tiles settle
+    if (window.html2canvas) {
+      const canvas = await html2canvas(document.getElementById('map'), {
+        useCORS: true, allowTaint: false, logging: false, scale: 1.4,
+        ignoreElements: el => el.classList && (el.classList.contains('side-handle') || el.id === 'quickControls' || el.classList.contains('base-layer-radio') || el.classList.contains('leaflet-control-zoom')),
+      });
+      mapImg = canvas.toDataURL('image/png');
+    }
+  } catch (e) { console.warn('map snapshot failed', e); }
+  if (prevBase && state.setBaseLayer) state.setBaseLayer(prevBase);
+
+  const tbl = (title, rws) => `<h2>${title}</h2><table>${rws.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
+  const w = window.open('', '_blank');
+  if (!w) { setStatus('Print blocked', 'allow pop-ups for this site'); return; }
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Sonde flight plan</title><style>
+    @page{size:A4 landscape;margin:9mm;}
+    html,body{margin:0;font:9px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;color:#16202a;}
+    .head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #0f8f86;padding-bottom:3px;margin-bottom:6px;}
+    .head h1{font-size:14px;margin:0;color:#0f8f86;}
+    .head span{font-size:8px;color:#5c6b78;}
+    .grid{display:grid;grid-template-columns:24% 1fr 24%;gap:8px;height:172mm;}
+    h2{font-size:10px;margin:0 0 3px;color:#0f8f86;border-bottom:1px solid #d3dae0;padding-bottom:2px;}
+    table{width:100%;border-collapse:collapse;margin-bottom:6px;}
+    td{border:0.5px solid #d3dae0;padding:2px 4px;vertical-align:top;}
+    td:first-child{color:#5c6b78;width:52%;}
+    td:last-child{font-family:ui-monospace,Menlo,monospace;}
+    .mapcol{display:flex;flex-direction:column;}
+    .mapcol img{width:100%;height:100%;object-fit:contain;border:1px solid #d3dae0;}
+    .foot{font-size:7px;color:#5c6b78;margin-top:4px;}
+  </style></head><body>
+    <div class="head"><h1>Weather Sonde Flight Planning</h1><span>${APP_VERSION} · printed ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC</span></div>
+    <div class="grid">
+      <div>${tbl('Flight settings', planRows)}</div>
+      <div class="mapcol"><h2>Trajectory (Streets)</h2>${mapImg ? `<img src="${mapImg}">` : '<p>Map snapshot unavailable.</p>'}</div>
+      <div>${tbl('Resulting flight data', resRows)}</div>
+    </div>
+    <div class="foot">Planning approximation — check manufacturer data, DABS/NOTAM and airspace before launch. Airspace data: OpenAIP (community).</div>
+  <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),300));<\/script></body></html>`);
+  w.document.close();
+}
+
+
+// Trajectory as a Google-Maps waypoint route: launch -> up to 8 points along
+// the path (burst included) -> landing. GMaps cannot draw free lines via URL.
+function buildGmapsTrajUrl() {
+  const r = state.lastResult;
+  if (!r || !r.traj || r.traj.path.length < 2) return null;
+  const path = r.traj.path;
+  const idxs = new Set([0, path.length - 1, r.traj.releaseIdx]);
+  const MID = 7;
+  for (let k = 1; k <= MID; k++) idxs.add(Math.round(k * (path.length - 1) / (MID + 1)));
+  const pts = [...idxs].sort((a, b) => a - b).map(i => path[i]);
+  return 'https://www.google.com/maps/dir/' + pts.map(p => `${p.lat.toFixed(5)},${p.lon.toFixed(5)}`).join('/');
+}
+
+function updateGmapsBtn() {
+  const b = $('gmapsTrajBtn');
+  if (b) b.hidden = !buildGmapsTrajUrl();
+}
+
 function wireUI() {
   on('sondeType', 'change', e => {
     const w = e.target.selectedOptions[0].dataset.weight;
@@ -1633,7 +1764,7 @@ function wireUI() {
     applyTheme(cur === 'light' ? 'dark' : 'light');
   });
   on('exportJsonBtn', 'click', exportJson);
-  on('printBtn', 'click', () => window.print());
+  on('printBtn', 'click', () => { printFlightReport().catch(showError); });
   on('copyLinkBtn', 'click', copyShareLink);
   on('exportImageBtn', 'click', exportImage);
 
@@ -1672,7 +1803,7 @@ function wireUI() {
   on('menuResultsBtn', 'click', () => { toggleResults(); const m = mainMenu(); if (m) { m.hidden = true; m.classList.remove('open'); } });
   on('menuAboutBtn', 'click', () => {
     const m = mainMenu(); if (m) { m.hidden = true; m.classList.remove('open'); }
-    window.open('readme.pdf', '_blank', 'noopener');
+    window.open('readme_viewer.html', '_blank', 'noopener');
   });
   on('menuCloseBtn', 'click', () => toggleDrawer(false));
   on('drawerHandle', 'click', () => toggleDrawer());
@@ -1831,6 +1962,17 @@ function wireUI() {
     { v: 'jma_msm', label: 'JMA MSM 5 km (Japan)' },
   ];
   window.__wxModels = wxModels;
+  function addWxRefreshEntry(pop) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'wx-refresh';
+    b.innerHTML = '<span>\u21BB Update weather now</span>';
+    b.addEventListener('click', () => {
+      pop.classList.remove('open');
+      recalcExistingTrajectory();
+    });
+    pop.appendChild(b);
+  }
   function syncWxSelect() {
     const sel = $('weatherModel');
     if (!sel) return;
@@ -1850,6 +1992,7 @@ function wireUI() {
     if (!pop) return;
     const cur = $('weatherModel').value;
     pop.innerHTML = '';
+    addWxRefreshEntry(pop);
     wxModels.forEach(m => {
       if (m.group) {
         const h = document.createElement('div');
@@ -1919,6 +2062,40 @@ function wireUI() {
     asTimer = setTimeout(refreshAirspaceOverlay, 600);
   });
   refreshAirspaceOverlay();
+
+
+  // G2: trajectory -> Google Maps (text opens the route, QR icon opens/closes the popover)
+  const gmPop = () => $('gmapsQrPop');
+  const closeGmPop = () => { const p = gmPop(); if (p) { p.hidden = true; p.classList.remove('open'); } };
+  on('gmapsTrajBtn', 'click', (e) => {
+    const url = buildGmapsTrajUrl();
+    if (!url) return;
+    if (e.target.closest('#gmapsQrIcon')) {
+      const p = gmPop();
+      if (!p) return;
+      if (!p.hidden) { closeGmPop(); return; }
+      const box = $('gmapsQrBox');
+      if (box && typeof qrcode === 'function') {
+        const q = qrcode(0, 'M');
+        q.addData(url);
+        q.make();
+        box.innerHTML = q.createSvgTag({ cellSize: 4, margin: 0 });
+      } else if (box) {
+        box.innerHTML = '<p class="hint">QR library not loaded — use the button text to open the link.</p>';
+      }
+      p.hidden = false;
+      p.classList.add('open');
+    } else {
+      closeGmPop();
+      window.open(url, '_blank', 'noopener');
+    }
+    e.stopPropagation();
+  });
+  on('gmapsQrCloseBtn', 'click', closeGmPop);
+  document.addEventListener('click', (e) => {
+    const p = gmPop();
+    if (p && !p.hidden && !p.contains(e.target) && !e.target.closest('#gmapsTrajBtn')) closeGmPop();
+  });
 
   // Collapsible cards
   document.querySelectorAll('.card > h3').forEach(h => {
