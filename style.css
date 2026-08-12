@@ -338,7 +338,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 .as-toggle.on .as-on{background:var(--accent);color:#00201d;}
 
 /* Speed legend bar at the map foot (cockpit legend-bar idiom) */
-.legend-bar{position:absolute;left:10px;bottom:26px;background:rgba(20,26,33,0.88);color:#fff;padding:5px 12px 6px;border-radius:8px;font-size:10.5px;font-weight:600;display:none;z-index:600;box-shadow:0 2px 8px rgba(0,0,0,.3);flex-direction:column;align-items:stretch;gap:4px;white-space:nowrap;}
+.legend-bar{position:static;align-self:flex-end;margin-left:8px;background:rgba(20,26,33,0.88);color:#fff;padding:5px 12px 6px;border-radius:8px;font-size:10.5px;font-weight:600;display:none;z-index:600;box-shadow:0 2px 8px rgba(0,0,0,.3);flex-direction:column;align-items:stretch;gap:4px;white-space:nowrap;}
 .lb-row{display:flex;align-items:center;gap:9px;}
 .lb-icons{gap:4px;justify-content:center;padding-bottom:2px;border-bottom:1px solid rgba(255,255,255,0.14);}
 .lb-icons span{font-size:8.5px;color:#aab4c0;font-weight:400;margin-right:7px;}
@@ -370,3 +370,9 @@ body.day .legend-bar .gwl-title,body.day .gwl-ticks span{color:#5c6b78;}
 .gm-qr{display:flex;justify-content:center;padding:10px 10px 4px;}
 .gm-qr svg{width:160px;height:160px;background:#fff;border-radius:6px;padding:6px;box-sizing:border-box;}
 .gm-hint{padding:2px 12px 8px;max-width:200px;}
+/* popup-blocked helper */
+.popup-help-card{position:relative;background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:18px 20px;max-width:340px;color:var(--text);font-size:12.5px;line-height:1.5;box-shadow:0 8px 28px rgba(0,0,0,.5);}
+.popup-help-card h3{margin:0 0 6px;font-size:14px;color:var(--bad);}
+.popup-help-card ol{margin:6px 0 4px;padding-left:18px;}
+.popup-help-card li{margin:3px 0;}
+.popup-open-link{display:block;margin-top:10px;text-align:center;background:var(--accent);color:#00201d;border-radius:8px;padding:9px 10px;font-weight:700;text-decoration:none;}

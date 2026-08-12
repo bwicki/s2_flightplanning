@@ -550,7 +550,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.47.0 · 2026-08-11';
+const APP_VERSION = 'v1.49.0 · 2026-08-11';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -1305,8 +1305,7 @@ function exportJson() {
 }
 
 function copyShareLink() {
-  const encoded = btoa(encodeURIComponent(JSON.stringify(gatherInputs())));
-  const url = `${location.origin}${location.pathname}?state=${encoded}`;
+  const url = buildShareUrl();
   if (navigator.clipboard) {
     navigator.clipboard.writeText(url).then(
       () => setStatus('Share link copied to clipboard.'),
@@ -1646,6 +1645,11 @@ function buildAirspaceMenu() {
 // snapshots the map via html2canvas, then opens a print window.
 async function printFlightReport() {
   if (state.busy) return;
+  // Open the target window inside the user gesture — after the map snapshot
+  // (async) the gesture is gone and every blocker would kill the window.
+  const w = window.open('', '_blank');
+  if (!w) { showPopupHelp(null); return; }
+  try { w.document.write('<p style="font:13px sans-serif;padding:20px;">Preparing flight report\u2026</p>'); } catch (e) { /* ignore */ }
   const rows = sel => [...document.querySelectorAll(sel)].map(cell => {
     const lab = cell.querySelector('label');
     const inp = cell.querySelector('input, select');
@@ -1681,29 +1685,44 @@ async function printFlightReport() {
   if (prevBase && state.setBaseLayer) state.setBaseLayer(prevBase);
 
   const tbl = (title, rws) => `<h2>${title}</h2><table>${rws.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
-  const w = window.open('', '_blank');
-  if (!w) { setStatus('Print blocked', 'allow pop-ups for this site'); return; }
+  let wptTable = '';
+  if (state.lastResult && state.lastResult.traj) {
+    const p = state.lastResult.traj.path;
+    const rel = p[state.lastResult.traj.releaseIdx];
+    const land = p[p.length - 1];
+    const fmt = q => `${q.lat.toFixed(5)}, ${q.lon.toFixed(5)}`;
+    wptTable = `<h2>Waypoints</h2><table class="wpt">
+      <tr><td>Launch</td><td>${fmt(p[0])} · ${Math.round(p[0].alt)} m</td></tr>
+      <tr><td>Burst / release</td><td>${fmt(rel)} · ${Math.round(rel.alt)} m</td></tr>
+      <tr><td>Landing</td><td>${fmt(land)} · ${Math.round(land.alt)} m</td></tr>
+    </table>`;
+  }
+  w.document.open();
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Sonde flight plan</title><style>
     @page{size:A4 landscape;margin:9mm;}
     html,body{margin:0;font:9px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;color:#16202a;}
     .head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #0f8f86;padding-bottom:3px;margin-bottom:6px;}
     .head h1{font-size:14px;margin:0;color:#0f8f86;}
     .head span{font-size:8px;color:#5c6b78;}
-    .grid{display:grid;grid-template-columns:24% 1fr 24%;gap:8px;height:172mm;}
+    .grid{display:flex;flex-direction:column;gap:6px;height:176mm;}
+    .mapwrap{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;}
+    .cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-height:62mm;overflow:hidden;}
     h2{font-size:10px;margin:0 0 3px;color:#0f8f86;border-bottom:1px solid #d3dae0;padding-bottom:2px;}
     table{width:100%;border-collapse:collapse;margin-bottom:6px;}
-    td{border:0.5px solid #d3dae0;padding:2px 4px;vertical-align:top;}
-    td:first-child{color:#5c6b78;width:52%;}
+    td{border:0.5px solid #d3dae0;padding:1px 3px;vertical-align:top;font-size:7.6px;}
+    td:first-child{color:#5c6b78;width:46%;}
     td:last-child{font-family:ui-monospace,Menlo,monospace;}
-    .mapcol{display:flex;flex-direction:column;}
-    .mapcol img{width:100%;height:100%;object-fit:contain;border:1px solid #d3dae0;}
+    .mapwrap img{width:100%;flex:1 1 auto;min-height:0;object-fit:contain;border:1px solid #d3dae0;}
+    table.wpt td{font-family:ui-monospace,Menlo,monospace;}
     .foot{font-size:7px;color:#5c6b78;margin-top:4px;}
   </style></head><body>
     <div class="head"><h1>Weather Sonde Flight Planning</h1><span>${APP_VERSION} · printed ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC</span></div>
     <div class="grid">
-      <div>${tbl('Flight settings', planRows)}</div>
-      <div class="mapcol"><h2>Trajectory (Streets)</h2>${mapImg ? `<img src="${mapImg}">` : '<p>Map snapshot unavailable.</p>'}</div>
-      <div>${tbl('Resulting flight data', resRows)}</div>
+      <div class="mapwrap"><h2>Trajectory (Streets)</h2>${mapImg ? `<img src="${mapImg}">` : '<p>Map snapshot unavailable.</p>'}</div>
+      <div class="cols">
+        <div>${tbl('Flight settings', planRows)}${wptTable}</div>
+        <div>${tbl('Resulting flight data', resRows)}</div>
+      </div>
     </div>
     <div class="foot">Planning approximation — check manufacturer data, DABS/NOTAM and airspace before launch. Airspace data: OpenAIP (community).</div>
   <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),300));<\/script></body></html>`);
@@ -1711,18 +1730,46 @@ async function printFlightReport() {
 }
 
 
-// Trajectory as a Google-Maps waypoint route: launch -> up to 8 points along
-// the path (burst included) -> landing. GMaps cannot draw free lines via URL.
-function buildGmapsTrajUrl() {
+// Google Maps cannot draw a free line via URL (a /dir/ link is always turned
+// into road routing). The trajectory is therefore exported as a KML file that
+// Google Earth / Google My Maps display as the actual flight line; the QR
+// code carries this app's share link, which reproduces the exact trajectory.
+function buildTrajKml() {
   const r = state.lastResult;
   if (!r || !r.traj || r.traj.path.length < 2) return null;
   const path = r.traj.path;
-  const idxs = new Set([0, path.length - 1, r.traj.releaseIdx]);
-  const MID = 7;
-  for (let k = 1; k <= MID; k++) idxs.add(Math.round(k * (path.length - 1) / (MID + 1)));
-  const pts = [...idxs].sort((a, b) => a - b).map(i => path[i]);
-  return 'https://www.google.com/maps/dir/' + pts.map(p => `${p.lat.toFixed(5)},${p.lon.toFixed(5)}`).join('/');
+  const rel = path[r.traj.releaseIdx];
+  const land = path[path.length - 1];
+  const coords = path.map(p => `${p.lon.toFixed(5)},${p.lat.toFixed(5)},${Math.round(p.alt)}`).join(' ');
+  const pm = (name, p) => `<Placemark><name>${name}</name><Point><coordinates>${p.lon.toFixed(5)},${p.lat.toFixed(5)},${Math.round(p.alt)}</coordinates></Point></Placemark>`;
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+<name>Sonde trajectory</name>
+<Style id="t"><LineStyle><color>ffc9d03f</color><width>4</width></LineStyle></Style>
+<Placemark><name>Trajectory</name><styleUrl>#t</styleUrl><LineString><altitudeMode>absolute</altitudeMode><coordinates>${coords}</coordinates></LineString></Placemark>
+${pm('Launch', path[0])}${pm('Burst', rel)}${pm('Landing', land)}
+</Document></kml>`;
 }
+
+function buildShareUrl() {
+  const encoded = btoa(encodeURIComponent(JSON.stringify(gatherInputs())));
+  return `${location.origin}${location.pathname}?state=${encoded}`;
+}
+
+function downloadTrajKml() {
+  const kml = buildTrajKml();
+  if (!kml) return;
+  const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'sonde-trajectory.kml';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  setStatus('KML downloaded', 'open in Google Earth / import to My Maps');
+}
+
+function buildGmapsTrajUrl() { return buildTrajKml() ? buildShareUrl() : null; }
 
 function updateGmapsBtn() {
   const show = !!buildGmapsTrajUrl();
@@ -1730,6 +1777,54 @@ function updateGmapsBtn() {
   if (b) b.hidden = !show;
   const sep = $('gmapsSep');
   if (sep) sep.hidden = !show;
+}
+
+
+// ---- Pop-up handling ------------------------------------------------------
+// Feature strings like 'noopener' make browsers treat the target as a popup
+// *window*, which blockers kill far more aggressively than plain new tabs.
+// So: open as a plain tab, null the opener afterwards, and when it is still
+// blocked, show device-specific instructions plus a direct link (a real tap
+// on an <a> is always allowed).
+function openTab(url) {
+  const w = window.open(url, '_blank');
+  if (w) { try { w.opener = null; } catch (e) { /* ignore */ } return w; }
+  showPopupHelp(url);
+  return null;
+}
+
+function showPopupHelp(url) {
+  let ov = $('popupHelp');
+  if (ov) ov.remove();
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+  let steps;
+  if (isIOS) {
+    steps = ['Open the iPad/iPhone <b>Settings</b> app', 'Scroll to <b>Safari</b> (or Apps \u2192 Safari)', 'Switch <b>Block Pop-ups</b> OFF', standalone ? 'Return to this app and try again (applies to home-screen apps too)' : 'Return to Safari and try again'];
+  } else if (/Edg\//.test(ua) || /Chrome\//.test(ua)) {
+    steps = ['Look at the right end of the address bar \u2014 a small <b>\u201cpop-up blocked\u201d</b> icon appeared', 'Click it and choose <b>\u201cAlways allow pop-ups and redirects from bwicki.github.io\u201d</b>', 'Click <b>Done</b> and try again'];
+  } else if (/Firefox\//.test(ua)) {
+    steps = ['A yellow bar appeared at the top: <b>\u201cFirefox prevented this site from opening a pop-up\u201d</b>', 'Click <b>Options / Preferences</b> in that bar', 'Choose <b>\u201cAllow pop-ups for bwicki.github.io\u201d</b> and try again'];
+  } else {
+    steps = ['Open <b>Safari \u2192 Settings \u2192 Websites \u2192 Pop-up Windows</b>', 'Set <b>bwicki.github.io</b> to <b>Allow</b>', 'Try again'];
+  }
+  ov = document.createElement('div');
+  ov.id = 'popupHelp';
+  ov.className = 'overlay';
+  ov.innerHTML = `<div class="popup-help-card">
+    <button type="button" class="overlay-close" id="popupHelpClose">\u2715</button>
+    <h3>\u26D4 Pop-ups are blocked</h3>
+    <p>The browser blocked the new window. To allow it permanently:</p>
+    <ol>${steps.map(s => `<li>${s}</li>`).join('')}</ol>
+    ${url ? `<a class="popup-open-link" href="${url}" target="_blank" rel="noopener">\u2197 Open the link directly now</a>` : ''}
+  </div>`;
+  document.body.appendChild(ov);
+  const close = () => ov.remove();
+  ov.querySelector('#popupHelpClose').addEventListener('click', close);
+  ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+  const a = ov.querySelector('.popup-open-link');
+  if (a) a.addEventListener('click', close);
 }
 
 function wireUI() {
@@ -1808,7 +1903,7 @@ function wireUI() {
   on('menuResultsBtn', 'click', () => { toggleResults(); const m = mainMenu(); if (m) { m.hidden = true; m.classList.remove('open'); } });
   on('menuAboutBtn', 'click', () => {
     const m = mainMenu(); if (m) { m.hidden = true; m.classList.remove('open'); }
-    window.open('readme_viewer.html', '_blank', 'noopener');
+    openTab('readme_viewer.html');
   });
   on('menuCloseBtn', 'click', () => toggleDrawer(false));
   on('drawerHandle', 'click', () => toggleDrawer());
@@ -1946,25 +2041,25 @@ function wireUI() {
     { v: 'cma_grapes_global', label: 'CMA GRAPES (China)' },
     { v: 'bom_access_global', label: 'BOM ACCESS-G (Australia)' },
     { group: 'Europe regional' },
-    { v: 'icon_eu', label: 'ICON-EU 7 km (DWD)' },
-    { v: 'icon_d2', label: 'ICON-D2 2 km (DWD)' },
-    { v: 'meteofrance_arpege_europe', label: 'ARPEGE Europe (MF)' },
-    { v: 'meteofrance_arome_france', label: 'AROME France 1.3 km' },
-    { v: 'meteofrance_arome_france_hd', label: 'AROME France HD' },
-    { v: 'ukmo_uk_deterministic_2km', label: 'UKMO UKV 2 km' },
-    { v: 'knmi_seamless', label: 'KNMI Seamless (NL)' },
-    { v: 'knmi_harmonie_arome_europe', label: 'KNMI HARMONIE Europe' },
-    { v: 'dmi_seamless', label: 'DMI Seamless (DK)' },
-    { v: 'dmi_harmonie_arome_europe', label: 'DMI HARMONIE Europe' },
-    { v: 'metno_seamless', label: 'MET Norway Seamless' },
-    { v: 'metno_nordic', label: 'MET Norway Nordic 1 km' },
-    { v: 'italia_meteo_arpae_icon_2i', label: 'ICON-2I Italy (ARPAE)' },
+    { v: 'icon_eu', label: 'ICON-EU 7 km (DWD)', cov: [29.5, -23.5, 70.5, 62.5] },
+    { v: 'icon_d2', label: 'ICON-D2 2 km (DWD)', cov: [43.2, -3.9, 58.0, 20.3] },
+    { v: 'meteofrance_arpege_europe', label: 'ARPEGE Europe (MF)', cov: [20, -32, 72, 42] },
+    { v: 'meteofrance_arome_france', label: 'AROME France 1.3 km', cov: [37.5, -12, 55.4, 16] },
+    { v: 'meteofrance_arome_france_hd', label: 'AROME France HD', cov: [37.5, -12, 55.4, 16] },
+    { v: 'ukmo_uk_deterministic_2km', label: 'UKMO UKV 2 km', cov: [44, -17, 61.5, 10] },
+    { v: 'knmi_seamless', label: 'KNMI Seamless (NL)', cov: [43, -12, 64, 25] },
+    { v: 'knmi_harmonie_arome_europe', label: 'KNMI HARMONIE Europe', cov: [43, -12, 64, 25] },
+    { v: 'dmi_seamless', label: 'DMI Seamless (DK)', cov: [44, -20, 72, 35] },
+    { v: 'dmi_harmonie_arome_europe', label: 'DMI HARMONIE Europe', cov: [44, -20, 72, 35] },
+    { v: 'metno_seamless', label: 'MET Norway Seamless', cov: [52, -18, 80.5, 54] },
+    { v: 'metno_nordic', label: 'MET Norway Nordic 1 km', cov: [52, -18, 80.5, 54] },
+    { v: 'italia_meteo_arpae_icon_2i', label: 'ICON-2I Italy (ARPAE)', cov: [33.7, 3, 48.9, 22] },
     { group: 'Regional (other)' },
-    { v: 'gfs_hrrr', label: 'HRRR 3 km (USA)' },
-    { v: 'ncep_nbm_conus', label: 'NBM CONUS (USA)' },
-    { v: 'gem_regional', label: 'GEM Regional (Canada)' },
-    { v: 'gem_hrdps_continental', label: 'GEM HRDPS 2.5 km (Canada)' },
-    { v: 'jma_msm', label: 'JMA MSM 5 km (Japan)' },
+    { v: 'gfs_hrrr', label: 'HRRR 3 km (USA)', cov: [21.1, -134.1, 52.6, -60.9] },
+    { v: 'ncep_nbm_conus', label: 'NBM CONUS (USA)', cov: [19.2, -138.3, 57.3, -59.0] },
+    { v: 'gem_regional', label: 'GEM Regional (Canada)', cov: [17.6, -179.9, 89.9, -40] },
+    { v: 'gem_hrdps_continental', label: 'GEM HRDPS 2.5 km (Canada)', cov: [39.6, -152.2, 76.0, -40] },
+    { v: 'jma_msm', label: 'JMA MSM 5 km (Japan)', cov: [22.4, 120, 47.6, 150] },
   ];
   window.__wxModels = wxModels;
   function addWxRefreshEntry(pop) {
@@ -1996,15 +2091,24 @@ function wireUI() {
     const pop = $('wxModelPopover');
     if (!pop) return;
     const cur = $('weatherModel').value;
+    // Only list models that actually cover the current launch position;
+    // global models (no cov box) are always shown.
+    const lat = parseFloat($('launchLat').value);
+    const lon = parseFloat($('launchLon').value);
+    const covers = m => !m.cov || (isNaN(lat) || isNaN(lon)) ||
+      (lat >= m.cov[0] && lon >= m.cov[1] && lat <= m.cov[2] && lon <= m.cov[3]);
     pop.innerHTML = '';
     addWxRefreshEntry(pop);
+    let pendingGroup = null;
     wxModels.forEach(m => {
-      if (m.group) {
+      if (m.group) { pendingGroup = m.group; return; }
+      if (!covers(m)) return;
+      if (pendingGroup) {
         const h = document.createElement('div');
         h.className = 'wx-group';
-        h.textContent = m.group;
+        h.textContent = pendingGroup;
         pop.appendChild(h);
-        return;
+        pendingGroup = null;
       }
       const b = document.createElement('button');
       b.type = 'button';
@@ -2099,11 +2203,8 @@ function wireUI() {
   if (qrIcon) qrIcon.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); openGmQr(); });
   on('gmapsTrajBtn', 'click', (e) => {
     if (e.target.closest && e.target.closest('#gmapsQrIcon')) return; // handled above
-    const url = buildGmapsTrajUrl();
-    if (!url) return;
     closeGmPop();
-    const w = window.open(url, '_blank', 'noopener');
-    if (!w) setStatus('Pop-up blocked', 'allow pop-ups to open Google Maps');
+    downloadTrajKml();
     e.stopPropagation();
   });
   on('gmapsQrCloseBtn', 'click', closeGmPop);
