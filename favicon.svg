@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    .up{fill:none;stroke:#0f8f86;stroke-width:4;stroke-linecap:round;stroke-linejoin:round}
+    .bal{fill:#0f8f86}.line{stroke:#0f8f86;stroke-width:3.6}
+    @media (prefers-color-scheme: dark){
+      .up{stroke:#3fd0c9}.bal{fill:#3fd0c9}.line{stroke:#3fd0c9}
+    }
+  </style>
+  <path class="up" d="M22 14 L30 4 L38 14"/>
+  <ellipse class="bal" cx="30" cy="32" rx="15" ry="17"/>
+  <path class="line" d="M30 49 L30 57"/>
+  <rect class="bal" x="25.5" y="57" width="9" height="7.5" rx="1.8"/>
+  <path d="M54 48 A16 13 0 0 1 86 48 Z" fill="#ffb454"/>
+  <path d="M56.5 50 L65 68 M83.5 50 L75 68" stroke="#ffb454" stroke-width="3.2"/>
+  <rect x="64.5" y="68" width="10.5" height="8.5" rx="1.8" fill="#ffb454"/>
+  <path d="M62 88 L70 97 L78 88" fill="none" stroke="#ffb454" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
