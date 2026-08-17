@@ -560,7 +560,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.56.0 · 2026-08-17';
+const APP_VERSION = 'v1.57.0 · 2026-08-17';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -603,10 +603,10 @@ function initMap() {
 
   // Base layers + always-visible radio control, top-right (cockpit idiom)
   const baseLayers = {
-    'Streets': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }),
-    'Terrain': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenTopoMap' }),
-    'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '© Esri' }),
-    'Light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd', attribution: '© OpenStreetMap, © CARTO' }),
+    'Streets': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, crossOrigin: 'anonymous', attribution: '© OpenStreetMap' }),
+    'Terrain': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, crossOrigin: 'anonymous', attribution: '© OpenTopoMap' }),
+    'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, crossOrigin: 'anonymous', attribution: '© Esri' }),
+    'Light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd', crossOrigin: 'anonymous', attribution: '© OpenStreetMap, © CARTO' }),
   };
   baseLayers['Streets'].addTo(state.map);
   let activeBaseLayerName = 'Streets';
@@ -630,6 +630,7 @@ function initMap() {
     }
   });
   state.map.addControl(new BaseLayerRadioControl());
+  state.baseLayerObjs = baseLayers;
   state.setBaseLayer = (name) => {
     if (!baseLayers[name] || name === activeBaseLayerName) return activeBaseLayerName;
     const prev = activeBaseLayerName;
@@ -1734,7 +1735,17 @@ async function printFlightReport() {
     if (state.trajectoryLine) {
       state.map.fitBounds(state.trajectoryLine.getBounds(), { padding: [30, 30], animate: false });
     }
-    await new Promise(r => setTimeout(r, 900)); // let tiles settle
+    // Wait for the tile layer to finish loading (up to 5 s), then a short
+    // beat for rendering — this is what puts streets/places into the print.
+    const streets = state.baseLayerObjs && state.baseLayerObjs['Streets'];
+    await new Promise(res => {
+      let done = false;
+      const finish = () => { if (!done) { done = true; setTimeout(res, 350); } };
+      const t = setTimeout(finish, 5000);
+      if (streets && streets.isLoading && !streets.isLoading()) { clearTimeout(t); finish(); }
+      else if (streets) streets.once('load', () => { clearTimeout(t); finish(); });
+      else { clearTimeout(t); setTimeout(finish, 1200); }
+    });
     if (window.html2canvas) {
       const canvas = await html2canvas(document.getElementById('map'), {
         useCORS: true, allowTaint: false, logging: false, scale: 1.4,
