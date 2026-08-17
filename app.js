@@ -542,7 +542,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.53.0 · 2026-08-11';
+const APP_VERSION = 'v1.54.0 · 2026-08-17';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -1889,7 +1889,7 @@ function updateEnsembleBtn(runningText) {
   const b = $('ensembleBtn');
   if (!b) return;
   const lbl = b.querySelector('.ens-lbl');
-  const ready = !!state.trajectoryLine && !state.busy;
+  const ready = !!state.trajectoryLine;
   b.classList.toggle('dis', !ready && !state.ensembleActive && !runningText);
   b.classList.toggle('active', !!state.ensembleActive);
   if (lbl) {
