@@ -376,7 +376,7 @@ body.day .legend-bar .gwl-title,body.day .gwl-ticks span{color:#5c6b78;}
 /* E1 ensemble chip: gray -> armed (violet) -> active (filled) */
 .ens-btn{color:#a06fe0;border-color:#8a4fd0;}
 .ens-btn svg{color:#a06fe0;}
-.ens-btn.dis{color:var(--muted);border-color:var(--border);opacity:0.55;cursor:default;}
+.ens-btn.dis{color:var(--muted);border-color:var(--border);opacity:0.5;cursor:default;pointer-events:none;background:var(--panel2);}
 .ens-btn.dis svg{color:var(--muted);}
 .ens-btn.active{background:#8a4fd0;color:#fff;border-color:#8a4fd0;}
 .ens-btn.active svg{color:#fff;}
@@ -385,3 +385,15 @@ body.day .ens-btn svg{color:#6a3fb5;}
 body.day .ens-btn.active{color:#fff;}
 body.day .ens-btn.active svg{color:#fff;}
 .ens-lbl{white-space:nowrap;}
+
+/* ensemble member number badges + map-foot legend */
+.ens-num{width:17px;height:17px;border-radius:50%;color:#fff;font:700 10px/17px var(--sans);text-align:center;border:1.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.5);}
+#ensembleLegend{position:absolute;left:50%;transform:translateX(-50%);bottom:8px;z-index:650;background:rgba(20,26,33,0.9);color:#fff;border-radius:8px;padding:6px 10px;font-size:10px;box-shadow:0 2px 8px rgba(0,0,0,.35);max-width:min(92vw,560px);display:flex;flex-wrap:wrap;gap:3px 14px;align-items:center;}
+#ensembleLegend .el-head{flex-basis:100%;font-weight:700;color:#c9b3ec;font-size:10px;letter-spacing:.4px;margin-bottom:1px;}
+#ensembleLegend .el-row{display:flex;align-items:center;gap:5px;white-space:nowrap;}
+#ensembleLegend .el-num{width:14px;height:14px;border-radius:50%;color:#fff;font:700 8.5px/14px var(--sans);text-align:center;flex-shrink:0;}
+#ensembleLegend .el-line{width:16px;height:3px;border-radius:2px;flex-shrink:0;}
+#ensembleLegend .el-lbl{color:#dfe5ea;font-size:9.5px;}
+body.day #ensembleLegend{background:rgba(255,255,255,0.94);color:#16202a;box-shadow:0 2px 8px rgba(0,0,0,.18);}
+body.day #ensembleLegend .el-head{color:#6a3fb5;}
+body.day #ensembleLegend .el-lbl{color:#3a4148;}

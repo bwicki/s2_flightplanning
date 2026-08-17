@@ -542,7 +542,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.52.0 · 2026-08-11';
+const APP_VERSION = 'v1.53.0 · 2026-08-11';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -1846,6 +1846,7 @@ const ENSEMBLE_META = {
   kma_seamless: { res: 13, cad: 6 }, cma_grapes_global: { res: 15, cad: 12 }, bom_access_global: { res: 15, cad: 12 },
 };
 const ENSEMBLE_MAX = 9;
+const ENSEMBLE_COLORS = ['#e0483f', '#4169e1', '#3fd06b', '#ffb454', '#c951d6', '#20c3d4', '#f06fa0', '#8fd63f', '#a07be0'];
 
 function ensembleModels(lat, lon) {
   const models = window.__wxModels || [];
@@ -1878,6 +1879,8 @@ function convexHull(pts) { // monotone chain on [lat, lon]
 
 function clearEnsemble() {
   if (state.ensembleLayer) { state.map.removeLayer(state.ensembleLayer); state.ensembleLayer = null; }
+  const leg = $('ensembleLegend');
+  if (leg) leg.remove();
   state.ensembleActive = false;
   updateEnsembleBtn();
 }
@@ -1896,6 +1899,36 @@ function updateEnsembleBtn(runningText) {
   }
 }
 
+// Inject a diagonal hatch pattern into the Leaflet SVG renderer once, so the
+// ensemble hull can be filled with visible hatching instead of a flat tint.
+function ensureEnsembleHatch() {
+  const svg = document.querySelector('#map svg');
+  if (!svg || svg.querySelector('#ensHatch')) return;
+  let defs = svg.querySelector('defs');
+  if (!defs) {
+    defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    svg.insertBefore(defs, svg.firstChild);
+  }
+  defs.insertAdjacentHTML('beforeend',
+    `<pattern id="ensHatch" patternUnits="userSpaceOnUse" width="10" height="10" patternTransform="rotate(45)">` +
+    `<rect width="10" height="10" fill="#8a4fd0" fill-opacity="0.10"/>` +
+    `<line x1="0" y1="0" x2="0" y2="10" stroke="#8a4fd0" stroke-width="2.5" stroke-opacity="0.45"/>` +
+    `</pattern>`);
+}
+
+function buildEnsembleLegend(results, mode) {
+  const old = $('ensembleLegend');
+  if (old) old.remove();
+  const el = document.createElement('div');
+  el.id = 'ensembleLegend';
+  el.innerHTML = `<div class="el-head">Ensemble — ${results.length} models · ${mode === 'backward' ? 'launch' : 'landing'} spread</div>` +
+    results.map(r =>
+      `<div class="el-row"><span class="el-num" style="background:${r.color};">${r.num}</span><span class="el-line" style="background:${r.color};"></span><span class="el-lbl">${r.m.label}</span></div>`
+    ).join('') +
+    `<div class="el-row"><span class="el-num" style="background:#8a4fd0;">★</span><span class="el-line" style="background:#8a4fd0;"></span><span class="el-lbl">most probable (weighted)</span></div>`;
+  document.getElementById('main').appendChild(el);
+}
+
 async function runEnsemble() {
   if (state.busy || !state.trajectoryLine || !state.lastResult) return;
   if (state.ensembleActive) { clearEnsemble(); return; }
@@ -1907,11 +1940,13 @@ async function runEnsemble() {
   if (!models.length) { setStatus('Ensemble', 'no models available here'); return; }
 
   state.busy = true;
+  updateEnsembleBtn('… wait for data');
+  setStatus('Ensemble starting…', `${models.length} models queued`);
   const results = [];
   try {
     for (let i = 0; i < models.length; i++) {
       const m = models[i];
-      updateEnsembleBtn(`Ensemble ${i + 1}/${models.length}`);
+      updateEnsembleBtn(`wait ${i + 1}/${models.length}…`);
       setStatus(`Ensemble ${i + 1}/${models.length}`, m.label);
       try {
         let r;
@@ -1948,28 +1983,45 @@ async function runEnsemble() {
   const best = { lat: sla / sw, lon: slo / sw };
 
   const layers = [];
-  results.forEach(r => {
+  results.forEach((r, i) => {
+    const col = ENSEMBLE_COLORS[i % ENSEMBLE_COLORS.length];
+    r.color = col;
+    r.num = i + 1;
+    // member trajectory: clearly visible colored line over a dark casing
     layers.push(L.polyline(r.traj.path.map(p => [p.lat, p.lon]),
-      { color: '#8a4fd0', weight: 2, opacity: 0.55, interactive: false }));
+      { color: '#0a0d10', weight: 5, opacity: 0.5, interactive: false }));
+    layers.push(L.polyline(r.traj.path.map(p => [p.lat, p.lon]),
+      { color: col, weight: 3, opacity: 0.95, interactive: false }));
+    // burst/release point of this member
+    const rel = r.traj.path[r.traj.releaseIdx];
+    layers.push(L.circleMarker([rel.lat, rel.lon],
+      { radius: 4.5, color: '#ffffff', weight: 1.5, fillColor: col, fillOpacity: 1 })
+      .bindTooltip(`${r.num} · ${r.m.label} — burst ${Math.round(rel.alt)} m`, { direction: 'top' }));
+    // endpoint dot
     layers.push(L.circleMarker([r.endpoint.lat, r.endpoint.lon],
-      { radius: 4, color: '#8a4fd0', weight: 1.5, fillColor: '#8a4fd0', fillOpacity: 0.85 })
-      .bindTooltip(r.m.label, { direction: 'top' }));
+      { radius: 5, color: '#ffffff', weight: 1.5, fillColor: col, fillOpacity: 1 })
+      .bindTooltip(`${r.num} · ${r.m.label}`, { direction: 'top' }));
+    // number badge at the member's mid-path
+    const mid = r.traj.path[Math.floor(r.traj.path.length / 2)];
+    layers.push(L.marker([mid.lat, mid.lon], {
+      icon: L.divIcon({
+        className: 'sig-marker',
+        html: `<div class="ens-num" style="background:${col};">${r.num}</div>`,
+        iconSize: [17, 17], iconAnchor: [8, 8],
+      }),
+      interactive: false,
+    }));
   });
   const hullPts = convexHull(results.map(r => [r.endpoint.lat, r.endpoint.lon]));
   if (hullPts.length >= 3) {
-    layers.push(L.polygon(hullPts, { color: '#8a4fd0', weight: 2, opacity: 0.9, fillColor: '#8a4fd0', fillOpacity: 0.14, interactive: false }));
+    ensureEnsembleHatch();
+    layers.push(L.polygon(hullPts, {
+      color: '#8a4fd0', weight: 3, opacity: 0.95, dashArray: '9 6',
+      fillColor: 'url(#ensHatch)', fillOpacity: 1, interactive: false,
+    }));
   }
-  const star = L.marker([best.lat, best.lon], {
-    icon: L.divIcon({
-      className: 'sig-marker',
-      html: `<svg width="26" height="26" viewBox="0 0 26 26"><path d="M13 2 L15.6 9.4 L23.5 9.6 L17.2 14.4 L19.5 22 L13 17.4 L6.5 22 L8.8 14.4 L2.5 9.6 L10.4 9.4 Z" fill="#8a4fd0" stroke="#fff" stroke-width="1.6"/></svg>`,
-      iconSize: [26, 26], iconAnchor: [13, 13],
-    }),
-    zIndexOffset: 900,
-  }).bindPopup(`Most probable ${mode === 'backward' ? 'launch' : 'landing'} point<br>${best.lat.toFixed(4)}, ${best.lon.toFixed(4)}<br><span style="font-size:10px;">weighted by grid resolution &amp; update cadence, ${results.length} models</span>`);
-  layers.push(star);
-
   state.ensembleLayer = L.featureGroup(layers).addTo(state.map);
+  buildEnsembleLegend(results, mode);
   state.ensembleActive = true;
   state.ensembleCount = results.length;
   updateEnsembleBtn();
