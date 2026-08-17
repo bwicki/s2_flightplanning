@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Weather Sonde Flight Planning - About</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#525659;}
+  #bar{position:fixed;top:0;right:0;z-index:1000;display:flex;gap:8px;padding:10px;}
+  #bar button{
+    display:flex;align-items:center;gap:6px;
+    background:#2a2f33;color:#fff;border:1px solid #444;border-radius:8px;
+    padding:8px 14px;font-size:13px;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;
+    cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.4);
+  }
+  #bar button:hover{background:#3a3f43;}
+  #pdfFrame{position:fixed;top:0;left:0;width:100%;height:100%;border:none;}
+</style>
+</head>
+<body>
+  <div id="bar">
+    <button onclick="document.getElementById('pdfFrame').contentWindow.print()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      Print
+    </button>
+    <button onclick="window.close()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Close
+    </button>
+  </div>
+  <iframe id="pdfFrame" src="readme.pdf"></iframe>
+</body>
+</html>

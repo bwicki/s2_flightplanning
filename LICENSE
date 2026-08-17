@@ -1,0 +1,68 @@
+Custom License — Weather Sonde Flight Planning
+
+Copyright (c) 2026 Balthasar Wicki, Wicki Partners Ballonteam. All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated files (the "Software"), to use and
+run the Software for personal, educational, or organizational purposes,
+subject to the following conditions:
+
+1. Permitted use
+   You may use, run, and display the Software as-is, including hosting
+   an unmodified copy of it for others to use (for example via GitHub
+   Pages or a similar static-hosting service).
+
+2. Not permitted without prior written permission
+   You may NOT, without the copyright holder's prior written permission:
+   a) modify, adapt, translate, or create derivative works based on the
+      Software;
+   b) redistribute, republish, sublicense, or otherwise make available
+      any modified or derivative version of the Software;
+   c) remove, obscure, or alter the copyright notice, attribution, or
+      logo contained in the Software;
+   d) use the Software, in whole or in part, as the basis for a
+      competing or similar product or service.
+
+3. Attribution
+   Any permitted copy, mirror, or public instance of the Software must
+   retain the original copyright notice, the author attribution, and the
+   Wicki Partners Ballonteam logo exactly as included in the Software,
+   along with a visible link back to the original source repository:
+   https://github.com/bwicki/s2_flightplanning
+
+4. No warranty
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+   CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM, OUT OF, OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+   In particular, the Software produces planning approximations for
+   weather balloon flights. Its outputs are no substitute for official
+   aeronautical information (DABS/NOTAM), manufacturer data, or the
+   judgement of the person responsible for a launch.
+
+5. Requesting permission
+   To request permission for modification, redistribution, or any use
+   beyond what is permitted above, please contact the copyright holder
+   directly via the source repository:
+   https://github.com/bwicki/s2_flightplanning
+
+---
+
+Third-party components: the following open-source libraries and data
+services are embedded in or used by this Software and remain under
+their own original licenses and terms regardless of this custom
+license — this custom license applies only to the original code and
+content of Weather Sonde Flight Planning itself:
+
+- Leaflet (BSD-2-Clause)
+- html2canvas (MIT)
+- qrcode-generator (MIT) — vendored as qrcode.js
+- Eruda on-screen console (MIT) — loaded on demand via ?debug
+- Map tiles: OpenStreetMap (ODbL / OSMF tile usage policy), OpenTopoMap
+  (CC-BY-SA), Esri World Imagery (Esri terms), CARTO basemaps (CARTO terms)
+- Weather data: Open-Meteo API (CC BY 4.0, non-commercial API terms)
+- Airspace data: OpenAIP (community data, OpenAIP terms)

@@ -195,7 +195,7 @@ button.primary:active{transform:scale(0.99);}
 .preset-editor #presetMsg{white-space:normal;}
 
 /* ---- results drawer (left, with handle) ---- */
-:root{--results-w:clamp(230px,18vw,440px);--vsl-h:clamp(80px,calc(100dvh - 600px),172px);}
+:root{--results-w:clamp(230px,18vw,440px);--vsl-h:clamp(80px,calc(100dvh - 562px),172px);}
 #resultsDrawer{position:absolute;top:0;right:0;height:100%;width:var(--results-w);background:var(--panel);border-left:1px solid var(--border);z-index:940;display:flex;flex-direction:column;transform:translateX(0);transition:transform .25s ease;box-shadow:-4px 0 18px rgba(0,0,0,.35);}
 #resultsDrawer.collapsed{transform:translateX(102%);box-shadow:none;}
 .results-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:5px;display:flex;flex-direction:column;gap:4px;scrollbar-width:none;}
@@ -206,7 +206,7 @@ button.primary:active{transform:scale(0.99);}
 .wx-group{font-size:9.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);padding:8px 14px 3px;border-bottom:1px solid var(--border);background:var(--panel);position:sticky;top:0;}
 
 /* ---- labeled side handles ---- */
-.side-handle{position:absolute;top:150px;z-index:960;width:42px;min-height:300px;padding:16px 0;display:flex;flex-direction:column;align-items:center;gap:12px;cursor:pointer;user-select:none;box-shadow:0 2px 10px rgba(0,0,0,.35);transition:left .25s ease,right .25s ease;}
+.side-handle{position:absolute;top:150px;z-index:960;width:42px;min-height:260px;padding:12px 0;display:flex;flex-direction:column;align-items:center;gap:12px;cursor:pointer;user-select:none;box-shadow:0 2px 10px rgba(0,0,0,.35);transition:left .25s ease,right .25s ease;}
 .side-handle .hbadge{width:26px;height:26px;border-radius:50%;background:#fff;color:#16202a;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .side-handle .hlbl{writing-mode:vertical-rl;text-orientation:mixed;font-size:14px;font-weight:700;letter-spacing:.8px;white-space:nowrap;}
 .side-handle:active{filter:brightness(1.12);}
@@ -274,7 +274,7 @@ button.primary:active{transform:scale(0.99);}
 }
 
 /* ---- release-altitude slider below the green handle (cockpit slider idiom) ---- */
-#quickControls{position:absolute;top:462px;left:var(--drawer-w);z-index:955;display:flex;align-items:stretch;transition:left .25s ease;}
+#quickControls{position:absolute;top:424px;left:var(--drawer-w);z-index:955;display:flex;align-items:stretch;transition:left .25s ease;}
 #quickControls.closed{left:0;}
 #launchTimeBox{width:95px;background:var(--panel2);border:1px solid var(--border);border-left:none;border-right:none;border-radius:0;padding:8px 8px;box-shadow:2px 2px 10px rgba(0,0,0,.3);display:flex;flex-direction:column;align-items:center;gap:5px;}
 #launchTimeBox input{font-size:9.5px;padding:2px 0;text-align:center;}

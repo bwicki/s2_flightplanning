@@ -37,7 +37,7 @@ Changing the release altitude, the launch date/time or an airspace category re-r
 Open-Meteo Forecast API (−5 to +15 days) with automatic switch to the Archive API (ERA5 reanalysis) for older dates. The header chip always names the model actually in effect:
 
 - With **auto selection**, the app itself picks the highest-resolution usable model — ICON-D2 2 km (Central Europe, ≤ ~44 h), ICON-EU 7 km (Europe, ≤ ~5 d), otherwise ECMWF IFS 0.25° — and requests it explicitly so it can be named ("auto-selected").
-- Any model can be chosen manually from the grouped catalogue (global models, European regional models incl. AROME/UKV/HARMONIE/ICON-2I, other regional models incl. HRRR/HRDPS/MSM).
+- Any model can be chosen manually from the grouped catalogue. The list is filtered dynamically: regional models only appear when the current launch position lies inside their coverage area (e.g. HRRR only in North America, ICON-D2 only in Central Europe); global models are always listed.
 - If a model does not cover the location/time, the app falls back and labels the fallback in the chip and results.
 
 ## Airspace overlay & conflict check (approximate)
@@ -57,15 +57,15 @@ Limits: FL limits are pressure altitudes compared against geometric altitude; AG
 - **Signatures:** royal-blue balloon (launch), explosion star (burst), red parachute with sonde (landing), violet crosshair (desired landing), and a prominent pulsing teal ring for the device position that always renders above the airspace shading.
 - **Trajectory:** drawn on a dedicated canvas layer with a genuine linear colour gradient per segment — the hue runs continuously from blue (slow) through green/yellow to red (fast, 0–50 km/h horizontal ground speed) over a dark casing.
 - Clicking launch/burst/landing flies to the point at the base layer's maximum zoom and opens a popup with the details plus an **"Open in Google Maps ↗"** link.
-- While a trajectory is shown, a slim two-row legend bar sits at the foot of the map: a small icon legend (launch / burst / landing) on top, and below it the continuous blue→red speed gradient whose scale stretches automatically to the speeds actually occurring in the current trajectory, with min / mid / max values (km/h) beneath the bar.
+- While a trajectory is shown, a slim two-row legend bar is docked to the right of the quick-controls group (moving with the Flight-settings panel): a small icon legend (launch / burst / landing) on top, and below it the continuous blue→red speed gradient whose scale stretches automatically to the speeds actually occurring in the current trajectory, with min / mid / max values (km/h) beneath the bar.
 - After every calculation the viewport is fitted to the whole flight path, keeping clear of the open side panels. Zoom control and the cockpit-style scale bar (segments, distance, ≈ 1:x) sit bottom right and slide left while the results panel is open. Version badge bottom left.
 
 ## User interface
 
-- **Top bar (fixed layout, never scrolls sideways):** ☰ menu (entries: 1 Flight settings, 2 Resulting flight data, Airspace overlay…, day/night switch, and always "ⓘ About — more info" opening this document in a PDF viewer with fixed Print/Close buttons), the mission-card mode toggle (Forward in launch blue, Backward in landing red), the compact weather-model chip, the **⬡ Airspace on/off toggle**, and the two-line status which truncates with an ellipsis instead of pushing the layout — the Wicki Partners logo stays visible on the right. The chip's second line shows when the weather was loaded and the lead of the used forecast hour (e.g. "ld 14:32 · wx +18h"); tapping the chip opens the model list with "↻ Update weather now" as the first entry. Once a trajectory exists, a "Traj → GMaps" button appears: its text opens the trajectory as a waypoint route (launch → path points incl. burst → landing) in Google Maps, and its QR icon opens a closable popover with a large QR code carrying the same route for scanning with a phone (Google Maps cannot draw free lines via URL, hence waypoints).
+- **Top bar (fixed layout, never scrolls sideways):** ☰ menu (entries: 1 Flight settings, 2 Resulting flight data, Airspace overlay…, day/night switch, and always "ⓘ About — more info" opening this document in a PDF viewer with fixed Print/Close buttons), the mission-card mode toggle (Forward in launch blue, Backward in landing red), the compact weather-model chip, the **⬡ Airspace on/off toggle**, and the two-line status which truncates with an ellipsis instead of pushing the layout — the Wicki Partners logo stays visible on the right. The chip's second line shows when the weather was loaded and the lead of the used forecast hour (e.g. "ld 14:32 · wx +18h"); tapping the chip opens the model list with "↻ Update weather now" as the first entry. Once a trajectory exists, a "Traj → KML" button appears: it downloads the flight line as a KML file (opens in Google Earth, imports into Google My Maps — Google Maps itself cannot draw free lines via URL), and its QR icon opens a closable popover with a large QR code carrying this app's share link, so a phone can display the exact same trajectory instantly.
 - **Panel 1 · Flight settings (left, green handle, ≤ 18 % of the window):** cards 01 Payload, 02 Balloon (presets in localStorage with inline editor), 03 Fill gas, 04 Site & time (place search, lat/lon, UTC), 05 Flight profile. All values carry small non-bold unit tags (g, m, kg/m³, °N/°E, m AMSL, m/s). On first open a red frame pulses around "Ascent target" and "Release altitude" until touched.
 - **Quick controls below the green handle** (move with the panel): a compact launch-time box — date/time editable in **LT or UTC** (segment toggle, persisted), with a conversion line always showing the other zone, plus a "now" button — and the **vertical release-altitude slider** (m AMSL, 500–7 000, 250 m steps) in the cockpit slider idiom. Every change re-runs the current prediction.
-- **Panel 2 · Resulting flight data (right, amber handle, ≤ 18 %):** exports (JSON; print — a single A4-landscape page with the flight settings table left, a Streets-layer map of the whole trajectory in the middle and the results table right; share link; PNG), the airspace conflict box, a data grid styled identically to the left panel (small labels, non-bold dark-grey mono values, explicit units), and the two-panel profile chart: altitude profile coloured by horizontal speed classes on top, the ground-speed curve (km/h, max labelled) below, dashed burst line through both, colour legend. Airspace violations are drawn into the altitude panel as red boxes spanning exactly the time window and altitude band of each conflict, labelled with the airspace name.
+- **Panel 2 · Resulting flight data (right, amber handle, ≤ 18 %):** exports (JSON; print — a single A4-landscape page with a large Streets-layer map of the whole trajectory on top and two slim data columns below: flight settings plus a launch/burst/landing waypoint-coordinate table left, results right; share link; PNG), the airspace conflict box, a data grid styled identically to the left panel (small labels, non-bold dark-grey mono values, explicit units), and the two-panel profile chart: altitude profile coloured by horizontal speed classes on top, the ground-speed curve (km/h, max labelled) below, dashed burst line through both, colour legend. Airspace violations are drawn into the altitude panel as red boxes spanning exactly the time window and altitude band of each conflict, labelled with the airspace name.
 - Both panels open/close via the large labelled vertical handles (1 Flight settings / 2 Resulting flight data) or the hamburger menu.
 
 ## Desktop & iPad (PWA)
@@ -81,13 +81,20 @@ Full-viewport layout with safe-area insets and cockpit-sized touch targets. Appl
 | `app.js` | Physics, Open-Meteo + OpenAIP integration, map/canvas rendering, UI logic; `APP_VERSION` at the top |
 | `apple-touch-icon.png` | 180×180 iOS home-screen tile |
 | `icon-4b.svg` | Source SVG of the app icon |
-| `readme.pdf` | This document as PDF, linked from the ☰ menu ("About — read first!") |
+| `readme.pdf` | This document as PDF, shown by the ☰ menu entry "About — more info" |
+| `readme_viewer.html` | PDF viewer with fixed Print/Close buttons for the About entry |
+| `qrcode.js` | Vendored qrcode-generator library (MIT) |
+| `LICENSE` | Custom source-available license |
 
 ## Deployment (GitHub Pages)
 
 1. Upload the app files to `github.com/bwicki/s2_flightplanning` (`main`, repo root) — drag & drop or "choose your files"; if Chrome kills the upload tab, retry in an incognito window.
 2. Pages serves from *main / root*; the site refreshes within about a minute.
 3. Hard-reload the browser (Ctrl/Cmd+Shift+R). Increment the `?v=N` cache busters in `index.html` and keep `APP_VERSION` in `app.js` (badge bottom left) in sync on every release. If a device shows a stale or "not found" state, load once with a throwaway query string (e.g. `?fresh=1`).
+
+## License
+
+Source-available under a custom license (see `LICENSE`): running and hosting unmodified copies is permitted; modification, redistribution of modified versions, removal of attribution/logo, and derivative products require prior written permission. Third-party libraries (Leaflet, html2canvas, qrcode-generator, Eruda) and data services (OpenStreetMap et al., Open-Meteo, OpenAIP) remain under their own licenses and terms.
 
 ## Model limitations
 
