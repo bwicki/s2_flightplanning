@@ -397,3 +397,10 @@ body.day .ens-btn.active svg{color:#fff;}
 body.day #ensembleLegend{background:rgba(255,255,255,0.94);color:#16202a;box-shadow:0 2px 8px rgba(0,0,0,.18);}
 body.day #ensembleLegend .el-head{color:#6a3fb5;}
 body.day #ensembleLegend .el-lbl{color:#3a4148;}
+
+/* ensemble legend checkboxes + adopt button */
+#ensembleLegend .el-row input[type=checkbox]{width:12px;height:12px;accent-color:#8a4fd0;margin:0;cursor:pointer;}
+#ensembleLegend label.el-row{cursor:pointer;}
+#ensembleLegend .el-row.off .el-lbl{opacity:0.45;text-decoration:line-through;}
+.ens-adopt{margin-top:6px;background:#8a4fd0;color:#fff;border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;}
+.ens-adopt:active{background:#6a3fb5;}

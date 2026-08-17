@@ -542,7 +542,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.54.0 · 2026-08-17';
+const APP_VERSION = 'v1.55.0 · 2026-08-17';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -893,6 +893,47 @@ function setVal(id, num, unit) {
   }
 }
 
+
+// Reverse geocoding for "near <place>/<CC>" labels (Nominatim, cached, best effort)
+const revGeoCache = new Map();
+async function reverseGeocode(lat, lon) {
+  const key = lat.toFixed(2) + ',' + lon.toFixed(2);
+  if (revGeoCache.has(key)) return revGeoCache.get(key);
+  let out = null;
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 6000);
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=12&accept-language=en`, { signal: ctl.signal });
+    clearTimeout(t);
+    if (res.ok) {
+      const d = await res.json();
+      const a = d.address || {};
+      const place = a.village || a.town || a.city || a.municipality || a.hamlet || a.county || null;
+      const cc = (a.country_code || '').toUpperCase();
+      if (place) out = `near ${place}${cc ? '/' + cc : ''}`;
+    }
+  } catch (e) { /* offline / rate limited -> coords only */ }
+  revGeoCache.set(key, out);
+  return out;
+}
+
+let ptLabelToken = 0;
+function fillPointCells(r) {
+  const launch = r.traj.path[0];
+  const land = r.traj.landing;
+  const fmt = p => `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;
+  const el1 = $('resLaunchPt'), el2 = $('resLandingPt');
+  if (el1) el1.textContent = fmt(launch);
+  if (el2) el2.textContent = fmt(land);
+  const token = ++ptLabelToken;
+  reverseGeocode(launch.lat, launch.lon).then(pl => {
+    if (pl && token === ptLabelToken && el1) el1.textContent = `${fmt(launch)} — ${pl}`;
+  });
+  reverseGeocode(land.lat, land.lon).then(pl => {
+    if (pl && token === ptLabelToken && el2) el2.textContent = `${fmt(land)} — ${pl}`;
+  });
+}
+
 function renderResults(r) {
   setVal('resPressure', (r.P0 / 100).toFixed(1), 'hPa');
   setVal('resGrossLift', (r.grossLiftKg * 1000).toFixed(1), 'g');
@@ -910,6 +951,7 @@ function renderResults(r) {
   if (r.tropopauseAlt) setVal('resTropopause', Math.round(r.tropopauseAlt).toLocaleString('de-CH'), 'm AMSL');
   else setVal('resTropopause', 'not detectable', 'from levels');
   $('resWeatherSource').textContent = `Open-Meteo ${r.weather.isArchive ? '(historical archive)' : '(forecast)'} — model: ${r.weather.modelUsed} — matched: ${r.weather.matchedTime} UTC`;
+  fillPointCells(r);
   if (r.note) $('calcError').textContent = r.note;
 }
 
@@ -1881,6 +1923,7 @@ function clearEnsemble() {
   if (state.ensembleLayer) { state.map.removeLayer(state.ensembleLayer); state.ensembleLayer = null; }
   const leg = $('ensembleLegend');
   if (leg) leg.remove();
+  state.ensembleResults = [];
   state.ensembleActive = false;
   updateEnsembleBtn();
 }
@@ -1921,11 +1964,20 @@ function buildEnsembleLegend(results, mode) {
   if (old) old.remove();
   const el = document.createElement('div');
   el.id = 'ensembleLegend';
-  el.innerHTML = `<div class="el-head">Ensemble — ${results.length} models · ${mode === 'backward' ? 'launch' : 'landing'} spread</div>` +
-    results.map(r =>
-      `<div class="el-row"><span class="el-num" style="background:${r.color};">${r.num}</span><span class="el-line" style="background:${r.color};"></span><span class="el-lbl">${r.m.label}</span></div>`
+  el.innerHTML = `<div class="el-head">Ensemble \u2014 ${results.filter(r => r.enabled).length}/${results.length} models \u00b7 ${mode === 'backward' ? 'launch' : 'landing'} spread</div>` +
+    results.map((r, i) =>
+      `<label class="el-row${r.enabled ? '' : ' off'}"><input type="checkbox" data-ei="${i}" ${r.enabled ? 'checked' : ''}>` +
+      `<span class="el-num" style="background:${r.color};">${r.num}</span><span class="el-line" style="background:${r.color};"></span><span class="el-lbl">${r.m.label}</span></label>`
     ).join('') +
-    `<div class="el-row"><span class="el-num" style="background:#8a4fd0;">★</span><span class="el-line" style="background:#8a4fd0;"></span><span class="el-lbl">most probable (weighted)</span></div>`;
+    `<div class="el-row"><span class="el-num" style="background:#8a4fd0;">\u2605</span><span class="el-line" style="background:#8a4fd0;"></span><span class="el-lbl">most probable (weighted)</span></div>`;
+  el.addEventListener('change', (e) => {
+    const idx = parseInt(e.target.dataset.ei, 10);
+    if (isNaN(idx)) return;
+    const r = state.ensembleResults[idx];
+    if (r.enabled && ensembleEnabled().length <= 2) { e.target.checked = true; return; } // keep >= 2 members
+    r.enabled = e.target.checked;
+    renderEnsembleLayers();
+  });
   document.getElementById('main').appendChild(el);
 }
 
@@ -1977,42 +2029,67 @@ async function runEnsemble() {
     return;
   }
 
-  // Weighted most-probable endpoint (grid resolution x update cadence)
-  let sw = 0, sla = 0, slo = 0;
-  results.forEach(r => { sw += r.m.weight; sla += r.endpoint.lat * r.m.weight; slo += r.endpoint.lon * r.m.weight; });
-  const best = { lat: sla / sw, lon: slo / sw };
+  results.forEach((r, i) => { r.color = ENSEMBLE_COLORS[i % ENSEMBLE_COLORS.length]; r.num = i + 1; r.enabled = true; });
+  state.ensembleResults = results;
+  state.ensembleMode = mode;
+  renderEnsembleLayers();
+  state.ensembleActive = true;
+  updateEnsembleBtn();
+  try { state.map.fitBounds(state.ensembleLayer.getBounds().extend(state.trajectoryLine.getBounds()), { padding: [60, 60] }); } catch (e) { /* keep view */ }
+}
 
+// Resample a path to K points by index fraction (for the weighted mean track)
+function resamplePath(path, K) {
+  const out = [];
+  for (let k = 0; k < K; k++) {
+    const f = k * (path.length - 1) / (K - 1);
+    const i0 = Math.floor(f), i1 = Math.min(i0 + 1, path.length - 1), t = f - i0;
+    out.push([path[i0].lat * (1 - t) + path[i1].lat * t, path[i0].lon * (1 - t) + path[i1].lon * t]);
+  }
+  return out;
+}
+
+function ensembleEnabled() { return (state.ensembleResults || []).filter(r => r.enabled); }
+
+function ensembleBest() {
+  const en = ensembleEnabled();
+  let sw = 0, sla = 0, slo = 0;
+  en.forEach(r => { sw += r.m.weight; sla += r.endpoint.lat * r.m.weight; slo += r.endpoint.lon * r.m.weight; });
+  return sw ? { lat: sla / sw, lon: slo / sw, n: en.length } : null;
+}
+
+function renderEnsembleLayers() {
+  if (state.ensembleLayer) { state.map.removeLayer(state.ensembleLayer); state.ensembleLayer = null; }
+  const en = ensembleEnabled();
+  const mode = state.ensembleMode;
+  if (!en.length) return;
   const layers = [];
-  results.forEach((r, i) => {
-    const col = ENSEMBLE_COLORS[i % ENSEMBLE_COLORS.length];
-    r.color = col;
-    r.num = i + 1;
-    // member trajectory: clearly visible colored line over a dark casing
+  en.forEach(r => {
+    const col = r.color;
     layers.push(L.polyline(r.traj.path.map(p => [p.lat, p.lon]),
       { color: '#0a0d10', weight: 5, opacity: 0.5, interactive: false }));
     layers.push(L.polyline(r.traj.path.map(p => [p.lat, p.lon]),
       { color: col, weight: 3, opacity: 0.95, interactive: false }));
-    // burst/release point of this member
+    // burst/release: small explosion cloud in the member color
     const rel = r.traj.path[r.traj.releaseIdx];
-    layers.push(L.circleMarker([rel.lat, rel.lon],
-      { radius: 4.5, color: '#ffffff', weight: 1.5, fillColor: col, fillOpacity: 1 })
-      .bindTooltip(`${r.num} · ${r.m.label} — burst ${Math.round(rel.alt)} m`, { direction: 'top' }));
-    // endpoint dot
+    layers.push(L.marker([rel.lat, rel.lon], {
+      icon: L.divIcon({
+        className: 'sig-marker',
+        html: `<svg width="18" height="18" viewBox="0 0 24 24"><path d="M12 2 L13.6 7.2 L18 4.5 L15.8 9.2 L21.5 9.5 L16.8 12.3 L20.5 16.5 L15 15.2 L15.5 21 L12 16.8 L8.5 21 L9 15.2 L3.5 16.5 L7.2 12.3 L2.5 9.5 L8.2 9.2 L6 4.5 L10.4 7.2 Z" fill="${col}" stroke="#fff" stroke-width="1.3"/></svg>`,
+        iconSize: [18, 18], iconAnchor: [9, 9],
+      }), interactive: true,
+    }).bindTooltip(`${r.num} · ${r.m.label} — burst ${Math.round(rel.alt)} m`, { direction: 'top' }));
     layers.push(L.circleMarker([r.endpoint.lat, r.endpoint.lon],
       { radius: 5, color: '#ffffff', weight: 1.5, fillColor: col, fillOpacity: 1 })
       .bindTooltip(`${r.num} · ${r.m.label}`, { direction: 'top' }));
-    // number badge at the member's mid-path
     const mid = r.traj.path[Math.floor(r.traj.path.length / 2)];
     layers.push(L.marker([mid.lat, mid.lon], {
-      icon: L.divIcon({
-        className: 'sig-marker',
-        html: `<div class="ens-num" style="background:${col};">${r.num}</div>`,
-        iconSize: [17, 17], iconAnchor: [8, 8],
-      }),
+      icon: L.divIcon({ className: 'sig-marker', html: `<div class="ens-num" style="background:${col};">${r.num}</div>`, iconSize: [17, 17], iconAnchor: [8, 8] }),
       interactive: false,
     }));
   });
-  const hullPts = convexHull(results.map(r => [r.endpoint.lat, r.endpoint.lon]));
+  // scatter hull (hatched)
+  const hullPts = convexHull(en.map(r => [r.endpoint.lat, r.endpoint.lon]));
   if (hullPts.length >= 3) {
     ensureEnsembleHatch();
     layers.push(L.polygon(hullPts, {
@@ -2020,14 +2097,60 @@ async function runEnsemble() {
       fillColor: 'url(#ensHatch)', fillOpacity: 1, interactive: false,
     }));
   }
+  // weighted mean trajectory — drawn last, on top of all members
+  const K = 60;
+  let sw = 0;
+  const acc = Array.from({ length: K }, () => [0, 0]);
+  en.forEach(r => {
+    const rp = resamplePath(r.traj.path, K);
+    for (let k = 0; k < K; k++) { acc[k][0] += rp[k][0] * r.m.weight; acc[k][1] += rp[k][1] * r.m.weight; }
+    sw += r.m.weight;
+  });
+  const meanPath = acc.map(p => [p[0] / sw, p[1] / sw]);
+  layers.push(L.polyline(meanPath, { color: '#ffffff', weight: 6, opacity: 0.75, interactive: false }));
+  layers.push(L.polyline(meanPath, { color: '#8a4fd0', weight: 3.5, opacity: 1, interactive: false }));
+
+  const best = ensembleBest();
+  const star = L.marker([best.lat, best.lon], {
+    icon: L.divIcon({
+      className: 'sig-marker',
+      html: `<svg width="26" height="26" viewBox="0 0 26 26"><path d="M13 2 L15.6 9.4 L23.5 9.6 L17.2 14.4 L19.5 22 L13 17.4 L6.5 22 L8.8 14.4 L2.5 9.6 L10.4 9.4 Z" fill="#8a4fd0" stroke="#fff" stroke-width="1.6"/></svg>`,
+      iconSize: [26, 26], iconAnchor: [13, 13],
+    }),
+    zIndexOffset: 900,
+  }).bindPopup(
+    `Most probable ${mode === 'backward' ? 'launch' : 'landing'} point<br>${best.lat.toFixed(5)}, ${best.lon.toFixed(5)}<br>` +
+    `<span style="font-size:10px;">weighted by grid resolution &amp; update cadence, ${best.n} models</span><br>` +
+    `<button type="button" class="ens-adopt" onclick="window.__ensAdopt()">\u2713 Use as ${mode === 'backward' ? 'launch point' : 'landing point'}</button>`
+  );
+  layers.push(star);
+
   state.ensembleLayer = L.featureGroup(layers).addTo(state.map);
-  buildEnsembleLegend(results, mode);
-  state.ensembleActive = true;
-  state.ensembleCount = results.length;
+  state.ensembleCount = en.length;
+  buildEnsembleLegend(state.ensembleResults, mode);
   updateEnsembleBtn();
-  setStatus(`Ensemble · ${results.length} models`, `spread shown — most probable ${mode === 'backward' ? 'launch' : 'landing'} marked`);
-  try { state.map.fitBounds(state.ensembleLayer.getBounds().extend(state.trajectoryLine.getBounds()), { padding: [60, 60] }); } catch (e) { /* keep view */ }
+  setStatus(`Ensemble \u00b7 ${en.length} models`, `spread shown \u2014 most probable ${mode === 'backward' ? 'launch' : 'landing'} marked`);
 }
+
+function adoptEnsembleBest() {
+  const best = ensembleBest();
+  if (!best) return;
+  const mode = state.ensembleMode;
+  const cell = $('resEnsBestCell');
+  const val = $('resEnsBest');
+  if (cell) cell.hidden = false;
+  if (val) val.textContent = `${best.lat.toFixed(5)}, ${best.lon.toFixed(5)} \u2014 ${mode === 'backward' ? 'launch' : 'landing'} \u00b7 weighted, ${best.n} models`;
+  if (mode === 'backward') {
+    $('launchLat').value = best.lat.toFixed(5);
+    $('launchLon').value = best.lon.toFixed(5);
+    if (state.launchMarker) state.launchMarker.setLatLng([best.lat, best.lon]);
+    setStatus('Ensemble best adopted', 'set as launch point \u2014 recalculate to apply');
+  } else {
+    setStatus('Ensemble best adopted', 'shown in results & flight report');
+  }
+  openResults();
+}
+window.__ensAdopt = adoptEnsembleBest;
 
 function wireUI() {
   on('sondeType', 'change', e => {

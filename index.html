@@ -32,6 +32,7 @@
   }
   window.__appError=show;
   window.addEventListener('error',function(e){
+    if(e.message && e.message.indexOf('ResizeObserver loop')!==-1){return;}
     if(e.target && (e.target.tagName==='SCRIPT'||e.target.tagName==='LINK')){
       show('Failed to load resource: '+(e.target.src||e.target.href||'?')+' \u2014 check network / content blocker');
     }else{
@@ -51,7 +52,7 @@
 </script>
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=54">
+<link rel="stylesheet" href="style.css?v=55">
   <script defer src="qrcode.js?v=1"></script>
 </head>
 <body>
@@ -207,6 +208,9 @@
           <div class="datacell"><label>Total flight time</label><span class="val" id="resFlightTime">—</span></div>
           <div class="datacell"><label>Landing distance</label><span class="val" id="resDistance">—</span></div>
           <div class="datacell"><label>Tropopause (model)</label><span class="val" id="resTropopause">—</span></div>
+          <div class="datacell wide"><label>Launch point</label><span class="val small" id="resLaunchPt">—</span></div>
+          <div class="datacell wide"><label>Landing point</label><span class="val small" id="resLandingPt">—</span></div>
+          <div class="datacell wide" id="resEnsBestCell" hidden><label>Ensemble best (adopted)</label><span class="val small" id="resEnsBest">—</span></div>
           <div class="datacell wide"><label>Weather data used</label><span class="val small" id="resWeatherSource">—</span></div>
         </div>
         <div class="profile-box">
@@ -365,6 +369,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=54"></script>
+<script src="app.js?v=55"></script>
 </body>
 </html>
