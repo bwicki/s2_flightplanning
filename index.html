@@ -51,7 +51,7 @@
 </script>
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=51">
+<link rel="stylesheet" href="style.css?v=52">
   <script defer src="qrcode.js?v=1"></script>
 </head>
 <body>
@@ -81,6 +81,10 @@
       </div>
       <span id="wxModelSub">tap to change</span>
     </div>
+    <button type="button" id="ensembleBtn" class="as-toggle ens-btn dis" title="Freeze the anchor point and run the trajectory with every model available for this region">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 19 Q9 12 12 5"/><path d="M4 19 Q11 14 16 8"/><path d="M4 19 Q13 17 20 12"/></svg>
+      <span class="ens-lbl">Ensemble</span>
+    </button>
     <select id="weatherModel" hidden>
       <option value="" selected>Best match (auto)</option>
       <option value="gfs_seamless">GFS (NOAA)</option>
@@ -360,6 +364,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=51"></script>
+<script src="app.js?v=52"></script>
 </body>
 </html>

@@ -488,6 +488,9 @@ const state = {
   deviceMarker: null,
   trajectoryLine: null,
   airspaceLayer: null,
+  ensembleLayer: null,
+  ensembleActive: false,
+  ensembleCount: 0,
   trajectoryGradient: null,
   profileViolations: [],
   lastResult: null,
@@ -539,7 +542,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.51.0 · 2026-08-11';
+const APP_VERSION = 'v1.52.0 · 2026-08-11';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -767,12 +770,12 @@ function showError(e) {
 // Core calculation given explicit launch coordinates. Returns everything
 // needed for rendering; does not touch the DOM.
 // ---------------------------------------------------------------------
-async function calculateFor(lat, lon) {
+async function calculateFor(lat, lon, modelOverride) {
   const dateUTC = $('launchDate').value;
   const timeUTC = $('launchTime').value;
   if (!dateUTC || !timeUTC) throw new Error('Please set a launch date and time (UTC).');
 
-  const modelSlug = $('weatherModel').value || null;
+  const modelSlug = modelOverride !== undefined ? modelOverride : ($('weatherModel').value || null);
   const weather = await fetchWeather(lat, lon, dateUTC, timeUTC, modelSlug);
   const z0 = weather.elevation;
   const P0 = weather.surfacePressurePa;
@@ -857,6 +860,7 @@ async function runCalculation() {
     setTimeout(fitFlightPath, 320);
     checkAirspaceViolations(r.traj).catch(() => {});
     updateGmapsBtn();
+    updateEnsembleBtn();
     updateWxChip(r.weather.modelUsed, {
       auto: r.weather.modelAuto,
       fellBack: r.weather.modelFellBack,
@@ -998,6 +1002,7 @@ const GradientPathLayer = L.Layer.extend({
 
 function drawTrajectory(traj) {
   state.profileViolations = [];
+  clearEnsemble();
   if (state.trajectoryGradient) { state.map.removeLayer(state.trajectoryGradient); state.trajectoryGradient = null; }
   const slb0 = $('speedLegendBar');
   if (slb0 && !state.trajectoryLine) slb0.classList.remove('show');
@@ -1243,6 +1248,7 @@ async function reverseCalcFromLanding(targetLat, targetLon) {
     setTimeout(fitFlightPath, 320);
     checkAirspaceViolations(result.traj).catch(() => {});
     updateGmapsBtn();
+    updateEnsembleBtn();
 
     const finalErr = haversine(targetLat, targetLon, result.traj.landing.lat, result.traj.landing.lon);
     setStatus('Launch site back-solved', `landing ${(finalErr / 1000).toFixed(1)} km from target`);
@@ -1813,6 +1819,164 @@ function showPopupHelp(url) {
   if (a) a.addEventListener('click', close);
 }
 
+
+// =========================================================================
+// Ensemble mode (E1): freeze the current anchor and rerun the trajectory
+// with every model available for the region; show all tracks, the scatter
+// hull and a marker at the weighted most-probable point.
+// =========================================================================
+// res = grid spacing (km), cad = documented update cadence (h). The API does
+// not expose the true run init time, so cadence serves as the age proxy.
+const ENSEMBLE_META = {
+  icon_d2: { res: 2.2, cad: 3 }, icon_eu: { res: 7, cad: 3 }, icon_seamless: { res: 11, cad: 3 },
+  icon_global: { res: 11, cad: 6 }, ecmwf_ifs025: { res: 25, cad: 6 }, ecmwf_aifs025: { res: 25, cad: 6 },
+  gfs_seamless: { res: 11, cad: 6 }, gfs_global: { res: 11, cad: 6 }, gfs_graphcast025: { res: 25, cad: 6 },
+  gfs_hrrr: { res: 3, cad: 1 }, ncep_nbm_conus: { res: 3, cad: 1 },
+  meteofrance_arpege_europe: { res: 11, cad: 6 }, meteofrance_seamless: { res: 11, cad: 6 },
+  meteofrance_arome_france: { res: 1.3, cad: 3 }, meteofrance_arome_france_hd: { res: 1.3, cad: 3 },
+  ukmo_seamless: { res: 10, cad: 6 }, ukmo_global_deterministic_10km: { res: 10, cad: 6 },
+  ukmo_uk_deterministic_2km: { res: 2, cad: 6 },
+  knmi_seamless: { res: 5.5, cad: 6 }, knmi_harmonie_arome_europe: { res: 5.5, cad: 6 },
+  dmi_seamless: { res: 2, cad: 3 }, dmi_harmonie_arome_europe: { res: 2, cad: 3 },
+  metno_seamless: { res: 1, cad: 3 }, metno_nordic: { res: 1, cad: 3 },
+  italia_meteo_arpae_icon_2i: { res: 2.2, cad: 3 },
+  gem_seamless: { res: 15, cad: 12 }, gem_global: { res: 15, cad: 12 },
+  gem_regional: { res: 10, cad: 6 }, gem_hrdps_continental: { res: 2.5, cad: 6 },
+  jma_seamless: { res: 20, cad: 6 }, jma_gsm: { res: 20, cad: 6 }, jma_msm: { res: 5, cad: 3 },
+  kma_seamless: { res: 13, cad: 6 }, cma_grapes_global: { res: 15, cad: 12 }, bom_access_global: { res: 15, cad: 12 },
+};
+const ENSEMBLE_MAX = 9;
+
+function ensembleModels(lat, lon) {
+  const models = window.__wxModels || [];
+  const covers = m => !m.cov || (lat >= m.cov[0] && lon >= m.cov[1] && lat <= m.cov[2] && lon <= m.cov[3]);
+  const list = models
+    .filter(m => !m.group && m.v && covers(m))
+    .map(m => {
+      const meta = ENSEMBLE_META[m.v] || { res: 25, cad: 6 };
+      return { v: m.v, label: m.label, weight: (1 / meta.res) * (3 / meta.cad) };
+    })
+    .sort((a, b) => b.weight - a.weight);
+  return list.slice(0, ENSEMBLE_MAX);
+}
+
+function convexHull(pts) { // monotone chain on [lat, lon]
+  if (pts.length < 3) return pts.slice();
+  const p = pts.slice().sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  const cross = (o, a, b) => (a[1] - o[1]) * (b[0] - o[0]) - (a[0] - o[0]) * (b[1] - o[1]);
+  const lower = [], upper = [];
+  for (const q of p) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop();
+    lower.push(q);
+  }
+  for (const q of p.reverse()) {
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) upper.pop();
+    upper.push(q);
+  }
+  return lower.slice(0, -1).concat(upper.slice(0, -1));
+}
+
+function clearEnsemble() {
+  if (state.ensembleLayer) { state.map.removeLayer(state.ensembleLayer); state.ensembleLayer = null; }
+  state.ensembleActive = false;
+  updateEnsembleBtn();
+}
+
+function updateEnsembleBtn(runningText) {
+  const b = $('ensembleBtn');
+  if (!b) return;
+  const lbl = b.querySelector('.ens-lbl');
+  const ready = !!state.trajectoryLine && !state.busy;
+  b.classList.toggle('dis', !ready && !state.ensembleActive && !runningText);
+  b.classList.toggle('active', !!state.ensembleActive);
+  if (lbl) {
+    if (runningText) lbl.textContent = runningText;
+    else if (state.ensembleActive) lbl.textContent = `Ensemble · ${state.ensembleCount || 0}`;
+    else lbl.textContent = 'Ensemble';
+  }
+}
+
+async function runEnsemble() {
+  if (state.busy || !state.trajectoryLine || !state.lastResult) return;
+  if (state.ensembleActive) { clearEnsemble(); return; }
+  const mode = currentMode();
+  const anchor = mode === 'backward' && state.targetMarker
+    ? state.targetMarker.getLatLng()
+    : { lat: parseFloat($('launchLat').value), lng: parseFloat($('launchLon').value) };
+  const models = ensembleModels(anchor.lat, anchor.lng);
+  if (!models.length) { setStatus('Ensemble', 'no models available here'); return; }
+
+  state.busy = true;
+  const results = [];
+  try {
+    for (let i = 0; i < models.length; i++) {
+      const m = models[i];
+      updateEnsembleBtn(`Ensemble ${i + 1}/${models.length}`);
+      setStatus(`Ensemble ${i + 1}/${models.length}`, m.label);
+      try {
+        let r;
+        if (mode === 'backward') {
+          // per-model back-solve for the launch point (frozen landing anchor)
+          let la = parseFloat($('launchLat').value), lo = parseFloat($('launchLon').value);
+          for (let it = 0; it < 3; it++) {
+            r = await calculateFor(la, lo, m.v);
+            const err = haversine(anchor.lat, anchor.lng, r.traj.landing.lat, r.traj.landing.lon);
+            if (err < 500) break;
+            la += anchor.lat - r.traj.landing.lat;
+            lo += anchor.lng - r.traj.landing.lon;
+          }
+          r = await calculateFor(la, lo, m.v);
+          results.push({ m, traj: r.traj, endpoint: { lat: la, lon: lo } });
+        } else {
+          r = await calculateFor(anchor.lat, anchor.lng, m.v);
+          results.push({ m, traj: r.traj, endpoint: { lat: r.traj.landing.lat, lon: r.traj.landing.lon } });
+        }
+      } catch (e) { console.warn('ensemble member failed', m.v, e); }
+    }
+  } finally {
+    state.busy = false;
+  }
+  if (results.length < 2) {
+    setStatus('Ensemble failed', 'not enough members succeeded');
+    updateEnsembleBtn();
+    return;
+  }
+
+  // Weighted most-probable endpoint (grid resolution x update cadence)
+  let sw = 0, sla = 0, slo = 0;
+  results.forEach(r => { sw += r.m.weight; sla += r.endpoint.lat * r.m.weight; slo += r.endpoint.lon * r.m.weight; });
+  const best = { lat: sla / sw, lon: slo / sw };
+
+  const layers = [];
+  results.forEach(r => {
+    layers.push(L.polyline(r.traj.path.map(p => [p.lat, p.lon]),
+      { color: '#8a4fd0', weight: 2, opacity: 0.55, interactive: false }));
+    layers.push(L.circleMarker([r.endpoint.lat, r.endpoint.lon],
+      { radius: 4, color: '#8a4fd0', weight: 1.5, fillColor: '#8a4fd0', fillOpacity: 0.85 })
+      .bindTooltip(r.m.label, { direction: 'top' }));
+  });
+  const hullPts = convexHull(results.map(r => [r.endpoint.lat, r.endpoint.lon]));
+  if (hullPts.length >= 3) {
+    layers.push(L.polygon(hullPts, { color: '#8a4fd0', weight: 2, opacity: 0.9, fillColor: '#8a4fd0', fillOpacity: 0.14, interactive: false }));
+  }
+  const star = L.marker([best.lat, best.lon], {
+    icon: L.divIcon({
+      className: 'sig-marker',
+      html: `<svg width="26" height="26" viewBox="0 0 26 26"><path d="M13 2 L15.6 9.4 L23.5 9.6 L17.2 14.4 L19.5 22 L13 17.4 L6.5 22 L8.8 14.4 L2.5 9.6 L10.4 9.4 Z" fill="#8a4fd0" stroke="#fff" stroke-width="1.6"/></svg>`,
+      iconSize: [26, 26], iconAnchor: [13, 13],
+    }),
+    zIndexOffset: 900,
+  }).bindPopup(`Most probable ${mode === 'backward' ? 'launch' : 'landing'} point<br>${best.lat.toFixed(4)}, ${best.lon.toFixed(4)}<br><span style="font-size:10px;">weighted by grid resolution &amp; update cadence, ${results.length} models</span>`);
+  layers.push(star);
+
+  state.ensembleLayer = L.featureGroup(layers).addTo(state.map);
+  state.ensembleActive = true;
+  state.ensembleCount = results.length;
+  updateEnsembleBtn();
+  setStatus(`Ensemble · ${results.length} models`, `spread shown — most probable ${mode === 'backward' ? 'launch' : 'landing'} marked`);
+  try { state.map.fitBounds(state.ensembleLayer.getBounds().extend(state.trajectoryLine.getBounds()), { padding: [60, 60] }); } catch (e) { /* keep view */ }
+}
+
 function wireUI() {
   on('sondeType', 'change', e => {
     const w = e.target.selectedOptions[0].dataset.weight;
@@ -2158,6 +2322,9 @@ function wireUI() {
   });
   refreshAirspaceOverlay();
 
+
+  on('ensembleBtn', 'click', () => { runEnsemble().catch(showError); });
+  updateEnsembleBtn();
 
   // G2: trajectory -> Google Maps (button text opens the route, QR icon toggles the popover)
   const gmPop = () => $('gmapsQrPop');
