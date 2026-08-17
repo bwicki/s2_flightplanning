@@ -487,11 +487,9 @@ const state = {
   targetMarker: null,
   deviceMarker: null,
   trajectoryLine: null,
-  trajectoryCasing: null,
   airspaceLayer: null,
   trajectoryGradient: null,
   profileViolations: [],
-  airspacePolys: [],
   lastResult: null,
   busy: false,
 };
@@ -521,15 +519,6 @@ const SIG_SVGS = {
   },
 };
 
-function sigIcon(kind) {
-  const s = SIG_SVGS[kind];
-  return L.divIcon({
-    className: 'sig-icon',
-    html: s.svg,
-    iconSize: s.size,
-    iconAnchor: s.anchor,
-  });
-}
 
 function sigMarker(lat, lon, kind) {
   const s = SIG_SVGS[kind];
@@ -550,7 +539,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.49.0 · 2026-08-11';
+const APP_VERSION = 'v1.50.0 · 2026-08-11';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -1009,7 +998,6 @@ const GradientPathLayer = L.Layer.extend({
 
 function drawTrajectory(traj) {
   state.profileViolations = [];
-  if (state.trajectoryCasing) { state.map.removeLayer(state.trajectoryCasing); state.trajectoryCasing = null; }
   if (state.trajectoryGradient) { state.map.removeLayer(state.trajectoryGradient); state.trajectoryGradient = null; }
   const slb0 = $('speedLegendBar');
   if (slb0 && !state.trajectoryLine) slb0.classList.remove('show');
@@ -1534,7 +1522,6 @@ function renderAirspaceToggle() {
 async function refreshAirspaceOverlay() {
   const types = enabledAsTypes();
   if (state.airspaceLayer) { state.map.removeLayer(state.airspaceLayer); state.airspaceLayer = null; }
-  state.airspacePolys = [];
   if (!airspaceVisible()) return;
   if (types.size === 0) return;
   if (state.map.getZoom() < 7) { setStatus('Airspace overlay', 'zoom in to load airspaces'); return; }
@@ -1555,7 +1542,6 @@ async function refreshAirspaceOverlay() {
         layer._asMeta = it;
         layers.push(layer);
       });
-      state.airspacePolys.push({ it, cat });
     });
     state.airspaceLayer = L.featureGroup(layers).addTo(state.map);
     state.airspaceLayer.eachLayer(l => { if (l.bringToBack) l.bringToBack(); });
