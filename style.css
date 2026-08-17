@@ -404,3 +404,7 @@ body.day #ensembleLegend .el-lbl{color:#3a4148;}
 #ensembleLegend .el-row.off .el-lbl{opacity:0.45;text-decoration:line-through;}
 .ens-adopt{margin-top:6px;background:#8a4fd0;color:#fff;border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;}
 .ens-adopt:active{background:#6a3fb5;}
+
+/* ICAO coordinate cells: coords line + "near place" line */
+.coordcell .pt-coord{display:block;font-size:10.5px;letter-spacing:-0.2px;white-space:nowrap;}
+.coordcell .pt-place{display:block;font-size:9px;color:var(--muted);font-family:var(--sans);margin-top:1px;}

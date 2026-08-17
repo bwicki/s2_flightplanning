@@ -131,6 +131,24 @@ function destPoint(lat, lon, dNorthM, dEastM) {
   const dLon = dEastM / (EARTH_R * Math.cos(lat * Math.PI / 180));
   return { lat: lat + dLat * 180 / Math.PI, lon: lon + dLon * 180 / Math.PI };
 }
+
+// ICAO coordinate notation: degrees / minutes / seconds.decimal + hemisphere,
+// e.g. 47\u00b022'36.8"N 008\u00b032'30.1"E (longitude with 3-digit degrees).
+function fmtDMS(v, isLat) {
+  const hemi = isLat ? (v >= 0 ? 'N' : 'S') : (v >= 0 ? 'E' : 'W');
+  const a = Math.abs(v);
+  let d = Math.floor(a);
+  let m = Math.floor((a - d) * 60);
+  let s = ((a - d) * 60 - m) * 60;
+  if (s >= 59.95) { s = 0; m += 1; }
+  if (m >= 60) { m = 0; d += 1; }
+  const dp = String(d).padStart(isLat ? 2 : 3, '0');
+  const mp = String(m).padStart(2, '0');
+  const sp = s.toFixed(1).padStart(4, '0');
+  return `${dp}\u00b0${mp}'${sp}"${hemi}`;
+}
+function fmtCoordsDMS(lat, lon) { return `${fmtDMS(lat, true)} ${fmtDMS(lon, false)}`; }
+
 function haversine(lat1, lon1, lat2, lon2) {
   const toRad = d => d * Math.PI / 180;
   const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
@@ -542,7 +560,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.55.0 · 2026-08-17';
+const APP_VERSION = 'v1.56.0 · 2026-08-17';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -624,7 +642,7 @@ function initMap() {
   };
 
   state.launchMarker = sigMarker(parseFloat($('launchLat').value), parseFloat($('launchLon').value), 'launch').addTo(state.map);
-  attachPointZoom(state.launchMarker, ll => `Launch site<br>${ll.lat.toFixed(4)}, ${ll.lng.toFixed(4)}`);
+  attachPointZoom(state.launchMarker, ll => `Launch site<br>${fmtCoordsDMS(ll.lat, ll.lng)}`);
 
   state.map.on('click', (e) => {
     if (state.busy) return;
@@ -921,17 +939,21 @@ let ptLabelToken = 0;
 function fillPointCells(r) {
   const launch = r.traj.path[0];
   const land = r.traj.landing;
-  const fmt = p => `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;
+  const set = (el, p) => {
+    if (!el) return;
+    el.innerHTML = `<span class="pt-coord">${fmtCoordsDMS(p.lat, p.lon)}</span><span class="pt-place">\u2026</span>`;
+  };
   const el1 = $('resLaunchPt'), el2 = $('resLandingPt');
-  if (el1) el1.textContent = fmt(launch);
-  if (el2) el2.textContent = fmt(land);
+  set(el1, launch);
+  set(el2, land);
   const token = ++ptLabelToken;
-  reverseGeocode(launch.lat, launch.lon).then(pl => {
-    if (pl && token === ptLabelToken && el1) el1.textContent = `${fmt(launch)} — ${pl}`;
+  const fillPlace = (el, lat, lon) => reverseGeocode(lat, lon).then(pl => {
+    if (token !== ptLabelToken || !el) return;
+    const ps = el.querySelector('.pt-place');
+    if (ps) ps.textContent = pl || '';
   });
-  reverseGeocode(land.lat, land.lon).then(pl => {
-    if (pl && token === ptLabelToken && el2) el2.textContent = `${fmt(land)} — ${pl}`;
-  });
+  fillPlace(el1, launch.lat, launch.lon);
+  fillPlace(el2, land.lat, land.lon);
 }
 
 function renderResults(r) {
@@ -1106,8 +1128,8 @@ function drawTrajectory(traj) {
 
   const land = traj.path[traj.path.length - 1];
   state.landMarker = sigMarker(land.lat, land.lon, 'land').addTo(state.map)
-    .bindPopup(`Predicted landing<br>${land.lat.toFixed(4)}, ${land.lon.toFixed(4)}`);
-  state.landMarker._baseHtml = `Predicted landing<br>${land.lat.toFixed(4)}, ${land.lon.toFixed(4)}`;
+    .bindPopup(`Predicted landing<br>${fmtCoordsDMS(land.lat, land.lon)}`);
+  state.landMarker._baseHtml = `Predicted landing<br>${fmtCoordsDMS(land.lat, land.lon)}`;
   attachPointZoom(state.landMarker);
 
   // Launch marker on top again for clarity
@@ -1253,7 +1275,7 @@ async function reverseCalcFromLanding(targetLat, targetLon) {
     // Mark the desired landing point (violet) immediately.
     if (state.targetMarker) state.map.removeLayer(state.targetMarker);
     state.targetMarker = sigMarker(targetLat, targetLon, 'target').addTo(state.map)
-      .bindPopup(`Desired landing<br>${targetLat.toFixed(4)}, ${targetLon.toFixed(4)}`).openPopup();
+      .bindPopup(`Desired landing<br>${fmtCoordsDMS(targetLat, targetLon)}`).openPopup();
 
     setStatus('Back-solving launch site…', 'iterating against wind field');
     $('calcError').textContent = '';
@@ -1490,6 +1512,7 @@ function asLimitText(lim) {
 }
 
 const asCache = new Map();
+const asRelayCooldown = { corsproxy: 0 };
 async function fetchAirspaces(bbox) {
   const key = (asPrefs().key || OPENAIP_DEFAULT_KEY).trim();
   if (!key) return [];
@@ -1504,12 +1527,12 @@ async function fetchAirspaces(bbox) {
   // The OpenAIP core API sends no CORS headers, so a direct browser fetch is
   // blocked. Try direct first (in case that changes), then public CORS relays.
   // Relays first: the direct call is CORS-blocked in browsers today and only
-  // kept as a last resort in case OpenAIP ever enables CORS.
-  const candidates = [
-    `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    url,
-  ];
+  // kept as a last resort in case OpenAIP ever enables CORS. A relay that
+  // answered 429 recently is demoted for 90 s to spread the load.
+  const cp = `https://corsproxy.io/?url=${encodeURIComponent(url)}`;
+  const ao = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+  const candidates = Date.now() < asRelayCooldown.corsproxy
+    ? [ao, cp, url] : [cp, ao, url];
   let data = null, lastErr = null;
   for (const u of candidates) {
     // Per-candidate timeout so a hanging relay falls through to the next one
@@ -1518,7 +1541,11 @@ async function fetchAirspaces(bbox) {
     const timer = ctl ? setTimeout(() => ctl.abort(), 9000) : null;
     try {
       const res = await fetch(u, ctl ? { signal: ctl.signal } : undefined);
-      if (!res.ok) { lastErr = new Error(`Airspace request failed (${res.status})`); continue; }
+      if (!res.ok) {
+        if (res.status === 429 && u.startsWith('https://corsproxy.io')) asRelayCooldown.corsproxy = Date.now() + 90000;
+        lastErr = new Error(`Airspace request failed (${res.status})`);
+        continue;
+      }
       data = await res.json();
       if (data && data.items) break;
       data = null;
@@ -1724,7 +1751,7 @@ async function printFlightReport() {
     const p = state.lastResult.traj.path;
     const rel = p[state.lastResult.traj.releaseIdx];
     const land = p[p.length - 1];
-    const fmt = q => `${q.lat.toFixed(5)}, ${q.lon.toFixed(5)}`;
+    const fmt = q => fmtCoordsDMS(q.lat, q.lon);
     wptTable = `<h2>Waypoints</h2><table class="wpt">
       <tr><td>Launch</td><td>${fmt(p[0])} · ${Math.round(p[0].alt)} m</td></tr>
       <tr><td>Burst / release</td><td>${fmt(rel)} · ${Math.round(rel.alt)} m</td></tr>
@@ -2018,7 +2045,7 @@ async function runEnsemble() {
           r = await calculateFor(anchor.lat, anchor.lng, m.v);
           results.push({ m, traj: r.traj, endpoint: { lat: r.traj.landing.lat, lon: r.traj.landing.lon } });
         }
-      } catch (e) { console.warn('ensemble member failed', m.v, e); }
+      } catch (e) { console.info('ensemble member skipped:', m.v, '\u2014', e && e.message); }
     }
   } finally {
     state.busy = false;
@@ -2075,14 +2102,14 @@ function renderEnsembleLayers() {
     layers.push(L.marker([rel.lat, rel.lon], {
       icon: L.divIcon({
         className: 'sig-marker',
-        html: `<svg width="18" height="18" viewBox="0 0 24 24"><path d="M12 2 L13.6 7.2 L18 4.5 L15.8 9.2 L21.5 9.5 L16.8 12.3 L20.5 16.5 L15 15.2 L15.5 21 L12 16.8 L8.5 21 L9 15.2 L3.5 16.5 L7.2 12.3 L2.5 9.5 L8.2 9.2 L6 4.5 L10.4 7.2 Z" fill="${col}" stroke="#fff" stroke-width="1.3"/></svg>`,
-        iconSize: [18, 18], iconAnchor: [9, 9],
+        html: `<svg width="22" height="22" viewBox="0 0 24 24"><path d="M12 2 L13.6 7.2 L18 4.5 L15.8 9.2 L21.5 9.5 L16.8 12.3 L20.5 16.5 L15 15.2 L15.5 21 L12 16.8 L8.5 21 L9 15.2 L3.5 16.5 L7.2 12.3 L2.5 9.5 L8.2 9.2 L6 4.5 L10.4 7.2 Z" fill="${col}" stroke="#fff" stroke-width="1.6"/></svg>`,
+        iconSize: [22, 22], iconAnchor: [11, 11],
       }), interactive: true,
     }).bindTooltip(`${r.num} · ${r.m.label} — burst ${Math.round(rel.alt)} m`, { direction: 'top' }));
     layers.push(L.circleMarker([r.endpoint.lat, r.endpoint.lon],
       { radius: 5, color: '#ffffff', weight: 1.5, fillColor: col, fillOpacity: 1 })
       .bindTooltip(`${r.num} · ${r.m.label}`, { direction: 'top' }));
-    const mid = r.traj.path[Math.floor(r.traj.path.length / 2)];
+    const mid = r.traj.path[Math.max(1, Math.floor(r.traj.path.length * 0.25))];
     layers.push(L.marker([mid.lat, mid.lon], {
       icon: L.divIcon({ className: 'sig-marker', html: `<div class="ens-num" style="background:${col};">${r.num}</div>`, iconSize: [17, 17], iconAnchor: [8, 8] }),
       interactive: false,
@@ -2119,7 +2146,7 @@ function renderEnsembleLayers() {
     }),
     zIndexOffset: 900,
   }).bindPopup(
-    `Most probable ${mode === 'backward' ? 'launch' : 'landing'} point<br>${best.lat.toFixed(5)}, ${best.lon.toFixed(5)}<br>` +
+    `Most probable ${mode === 'backward' ? 'launch' : 'landing'} point<br>${fmtCoordsDMS(best.lat, best.lon)}<br>` +
     `<span style="font-size:10px;">weighted by grid resolution &amp; update cadence, ${best.n} models</span><br>` +
     `<button type="button" class="ens-adopt" onclick="window.__ensAdopt()">\u2713 Use as ${mode === 'backward' ? 'launch point' : 'landing point'}</button>`
   );
@@ -2139,7 +2166,7 @@ function adoptEnsembleBest() {
   const cell = $('resEnsBestCell');
   const val = $('resEnsBest');
   if (cell) cell.hidden = false;
-  if (val) val.textContent = `${best.lat.toFixed(5)}, ${best.lon.toFixed(5)} \u2014 ${mode === 'backward' ? 'launch' : 'landing'} \u00b7 weighted, ${best.n} models`;
+  if (val) val.textContent = `${fmtCoordsDMS(best.lat, best.lon)} \u2014 ${mode === 'backward' ? 'launch' : 'landing'} \u00b7 weighted, ${best.n} models`;
   if (mode === 'backward') {
     $('launchLat').value = best.lat.toFixed(5);
     $('launchLon').value = best.lon.toFixed(5);
