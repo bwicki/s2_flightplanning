@@ -440,3 +440,8 @@ body.day #rr4Profile{background:rgba(0,0,0,0.04);}
 #rr4Box .rr4-big{font-size:14px;font-weight:700;color:#3fd0c9;}
 body.day #rr4Box .rr4-big{color:#0f8f86;}
 body.day #rr4Box .rr4-unit{color:#5c6b78;}
+
+#rr4Box #rr4Airspace.viol{color:#ff6b61;}
+#rr4Box #rr4Airspace.clear{color:#3fd06b;}
+body.day #rr4Box #rr4Airspace.viol{color:#c0392b;}
+body.day #rr4Box #rr4Airspace.clear{color:#1e8449;}
