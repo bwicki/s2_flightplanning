@@ -560,7 +560,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.64.0 · 2026-08-17';
+const APP_VERSION = 'v1.65.0 · 2026-08-17';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -969,13 +969,14 @@ function updateRr4Box(r) {
   const relAlt = relPt ? relPt.alt : (sl ? parseFloat(sl.value) : NaN);
   const t = (id) => { const el = $(id); return el ? el.textContent : '—'; };
   const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
-  set('rr4Cutdown', isFinite(relAlt) ? `${Math.round(relAlt)} m` : '—');
+  const num = v => { const m = String(v).match(/^[0-9.,:'\u2019\-]+/); return m ? m[0] : '\u2014'; };
+  set('rr4Cutdown', isFinite(relAlt) ? `${Math.round(relAlt)}` : '\u2014');
   set('rr4Ground', `${Math.round(r.weather.elevation)}`);
   set('rr4Pressure', `${(r.weather.surfacePressurePa / 100).toFixed(1)}`);
-  set('rr4Lift', `${t('resGrossLift')} / ${t('resNetLift')}`);
-  set('rr4Times', `${t('resAscentTime')} / ${t('resFlightTime')}`);
-  set('rr4Dist', t('resDistance'));
-  set('rr4Burst', t('resBurstAlt'));
+  set('rr4Lift', `${num(t('resGrossLift'))} / ${num(t('resNetLift'))}`);
+  set('rr4Times', `${num(t('resAscentTime'))} / ${num(t('resFlightTime'))}`);
+  set('rr4Dist', num(t('resDistance')));
+  set('rr4Burst', num(t('resBurstAlt')));
   const as = $('rr4Airspace');
   if (as) { as.textContent = '…'; as.classList.remove('viol', 'clear'); }
   renderPfiProfile(r.traj);
@@ -1009,7 +1010,7 @@ function updatePfiAirspace(traj) {
   const as = $('rr4Airspace');
   if (as) {
     const bad = (state.profileViolations || []).length > 0;
-    as.textContent = bad ? 'violated' : 'no violation';
+    as.textContent = bad ? 'violated' : 'not violated';
     as.classList.toggle('viol', bad);
     as.classList.toggle('clear', !bad);
   }

@@ -410,10 +410,13 @@ body.day #ensembleLegend .el-lbl{color:#3a4148;}
 .coordcell .pt-place{display:block;font-size:9px;color:var(--muted);font-family:var(--sans);margin-top:1px;}
 
 /* RR4 config parameters — floats left of the results handle */
-#rr4Box{position:absolute;top:118px;right:52px;z-index:955;transition:right 0.28s ease;background:rgba(20,26,33,0.92);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:8px 11px;min-width:172px;box-shadow:0 3px 10px rgba(0,0,0,.4);}
+#rr4Box{position:absolute;top:118px;right:52px;z-index:955;transition:right 0.28s ease;background:rgba(20,26,33,0.92);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:8px 11px;min-width:216px;box-shadow:0 3px 10px rgba(0,0,0,.4);}
 #rr4Box .rr4-title{font-size:9.5px;font-weight:700;letter-spacing:.6px;color:#ffb454;text-transform:uppercase;margin-bottom:5px;}
-#rr4Box .rr4-row{display:flex;justify-content:space-between;gap:12px;font-size:10.5px;color:#aab4c0;padding:1.5px 0;}
-#rr4Box .rr4-row b{font-family:var(--mono);font-weight:600;color:#fff;white-space:nowrap;}
+#rr4Box .rr4-row{display:flex;align-items:baseline;gap:6px;font-size:10.5px;color:#aab4c0;padding:1.5px 0;}
+#rr4Box .rr4-row > span:first-child{flex:1 1 auto;}
+#rr4Box .rr4-val{width:80px;flex-shrink:0;text-align:left;font-family:var(--mono);font-weight:600;color:#fff;}
+#rr4Box .rr4-unit{width:46px;flex-shrink:0;text-align:left;font-size:9px;font-weight:400;color:#aab4c0;font-family:var(--sans);}
+
 body.day #rr4Box{background:rgba(255,255,255,0.95);border-color:#d3dae0;box-shadow:0 3px 10px rgba(0,0,0,.15);}
 body.day #rr4Box .rr4-title{color:#b07515;}
 body.day #rr4Box .rr4-row{color:#5c6b78;}
@@ -435,6 +438,5 @@ body.day #rr4Profile{background:rgba(0,0,0,0.04);}
 
 /* PFI: emphasized top-three values with units */
 #rr4Box .rr4-big{font-size:14px;font-weight:700;color:#3fd0c9;}
-#rr4Box .rr4-big .rr4-unit{font-size:9px;font-weight:400;color:#aab4c0;}
 body.day #rr4Box .rr4-big{color:#0f8f86;}
-body.day #rr4Box .rr4-big .rr4-unit{color:#5c6b78;}
+body.day #rr4Box .rr4-unit{color:#5c6b78;}
