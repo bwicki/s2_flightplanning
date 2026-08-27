@@ -560,7 +560,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.62.0 · 2026-08-17';
+const APP_VERSION = 'v1.63.0 · 2026-08-17';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -964,7 +964,9 @@ function fillPointCells(r) {
 function updateRr4Box(r) {
   const box = $('rr4Box');
   if (!box || !r || !r.weather) return;
-  const relAlt = parseFloat($('releaseAlt').value);
+  const relPt = r.traj && r.traj.path[r.traj.releaseIdx];
+  const sl = $('sReleaseAlt');
+  const relAlt = relPt ? relPt.alt : (sl ? parseFloat(sl.value) : NaN);
   const t = (id) => { const el = $(id); return el ? el.textContent : '—'; };
   const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
   set('rr4Cutdown', isFinite(relAlt) ? `${Math.round(relAlt)} m` : '—');
@@ -1031,8 +1033,8 @@ function renderResults(r) {
   if (r.tropopauseAlt) setVal('resTropopause', Math.round(r.tropopauseAlt).toLocaleString('de-CH'), 'm AMSL');
   else setVal('resTropopause', 'not detectable', 'from levels');
   $('resWeatherSource').textContent = `Open-Meteo ${r.weather.isArchive ? '(historical archive)' : '(forecast)'} — model: ${r.weather.modelUsed} — matched: ${r.weather.matchedTime} UTC`;
-  fillPointCells(r);
-  updateRr4Box(r);
+  try { fillPointCells(r); } catch (e) { console.warn('point cells', e); }
+  try { updateRr4Box(r); } catch (e) { console.warn('PFI box', e); }
   if (r.note) $('calcError').textContent = r.note;
 }
 
