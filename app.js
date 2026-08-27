@@ -560,7 +560,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.63.0 · 2026-08-17';
+const APP_VERSION = 'v1.64.0 · 2026-08-17';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -1009,7 +1009,7 @@ function updatePfiAirspace(traj) {
   const as = $('rr4Airspace');
   if (as) {
     const bad = (state.profileViolations || []).length > 0;
-    as.textContent = bad ? 'violated' : 'clear';
+    as.textContent = bad ? 'violated' : 'no violation';
     as.classList.toggle('viol', bad);
     as.classList.toggle('clear', !bad);
   }

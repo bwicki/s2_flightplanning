@@ -58,7 +58,7 @@
 </script>
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=63">
+<link rel="stylesheet" href="style.css?v=64">
   <script defer src="qrcode.js?v=1"></script>
 </head>
 <body>
@@ -192,9 +192,9 @@
         <button type="button" id="rr4CloseBtn" class="overlay-close rr4-close" title="Close" aria-label="Close">✕</button>
       </div>
       <div class="rr4-sub">S2/RR4 Config Data</div>
-      <div class="rr4-row"><span>Cut-down Alt</span><b id="rr4Cutdown">—</b></div>
-      <div class="rr4-row"><span>Ground Alt (m MSL)</span><b id="rr4Ground">—</b></div>
-      <div class="rr4-row"><span>Ground pressure [hPa]</span><b id="rr4Pressure">—</b></div>
+      <div class="rr4-row"><span>Cut-down Alt</span><b id="rr4Cutdown" class="rr4-big">—</b></div>
+      <div class="rr4-row"><span>Ground Alt</span><b class="rr4-big"><span id="rr4Ground">—</span> <span class="rr4-unit">m AMSL</span></b></div>
+      <div class="rr4-row"><span>Ground pressure</span><b class="rr4-big"><span id="rr4Pressure">—</span> <span class="rr4-unit">hPa</span></b></div>
       <div class="rr4-row"><span>Gross/net lift</span><b id="rr4Lift">—</b></div>
       <div class="rr4-sub">Key Flight Data</div>
       <div class="rr4-row"><span>Ascent/total time</span><b id="rr4Times">—</b></div>
@@ -392,6 +392,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=63"></script>
+<script src="app.js?v=64"></script>
 </body>
 </html>
