@@ -560,7 +560,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.66.0 · 2026-08-17';
+const APP_VERSION = 'v1.67.0 · 2026-08-17';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -974,7 +974,8 @@ function updateRr4Box(r) {
   set('rr4Ground', `${Math.round(r.weather.elevation)}`);
   set('rr4Pressure', `${(r.weather.surfacePressurePa / 100).toFixed(1)}`);
   set('rr4Lift', `${num(t('resGrossLift'))} / ${num(t('resNetLift'))}`);
-  set('rr4Times', `${num(t('resAscentTime'))} / ${num(t('resFlightTime'))}`);
+  const hm = sec => `${Math.floor(sec / 3600)}:${String(Math.round((sec % 3600) / 60)).padStart(2, '0')}`;
+  set('rr4Times', `${hm(r.ascentTimeSec)} / ${hm(r.traj.totalTimeSec)}`);
   set('rr4Dist', num(t('resDistance')));
   set('rr4Burst', num(t('resBurstAlt')));
   const as = $('rr4Airspace');

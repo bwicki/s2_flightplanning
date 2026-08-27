@@ -58,7 +58,7 @@
 </script>
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=66">
+<link rel="stylesheet" href="style.css?v=67">
   <script defer src="qrcode.js?v=1"></script>
 </head>
 <body>
@@ -192,14 +192,14 @@
         <button type="button" id="rr4CloseBtn" class="overlay-close rr4-close" title="Close" aria-label="Close">✕</button>
       </div>
       <div class="rr4-sub">S2/RR4 Config Data</div>
-      <div class="rr4-row"><span>Cut-down Alt</span><b class="rr4-val rr4-big" id="rr4Cutdown">—</b><span class="rr4-unit">m AMSL</span></div>
-      <div class="rr4-row"><span>Ground Alt</span><b class="rr4-val rr4-big" id="rr4Ground">—</b><span class="rr4-unit">m AMSL</span></div>
-      <div class="rr4-row"><span>Ground pressure</span><b class="rr4-val rr4-big" id="rr4Pressure">—</b><span class="rr4-unit">hPa</span></div>
+      <div class="rr4-row"><span>Cut-down Alt</span><b class="rr4-val rr4-big rr4-r" id="rr4Cutdown">—</b><span class="rr4-unit">m AMSL</span></div>
+      <div class="rr4-row"><span>Ground Alt</span><b class="rr4-val rr4-big rr4-r" id="rr4Ground">—</b><span class="rr4-unit">m AMSL</span></div>
+      <div class="rr4-row"><span>Ground pressure</span><b class="rr4-val rr4-big rr4-r" id="rr4Pressure">—</b><span class="rr4-unit">hPa</span></div>
       <div class="rr4-row"><span>Gross/net lift</span><b class="rr4-val" id="rr4Lift">—</b><span class="rr4-unit">g</span></div>
       <div class="rr4-sub">Key Flight Data</div>
       <div class="rr4-row"><span>Ascent/total time</span><b class="rr4-val" id="rr4Times">—</b><span class="rr4-unit">h</span></div>
-      <div class="rr4-row"><span>Landing Distance</span><b class="rr4-val" id="rr4Dist">—</b><span class="rr4-unit">km</span></div>
-      <div class="rr4-row"><span>Burst Alt</span><b class="rr4-val" id="rr4Burst">—</b><span class="rr4-unit">m AMSL</span></div>
+      <div class="rr4-row"><span>Landing Distance</span><b class="rr4-val rr4-r" id="rr4Dist">—</b><span class="rr4-unit">km</span></div>
+      <div class="rr4-row"><span>Burst Alt</span><b class="rr4-val rr4-r" id="rr4Burst">—</b><span class="rr4-unit">m AMSL</span></div>
       <div class="rr4-row"><span>Airspace</span><b class="rr4-val" id="rr4Airspace">—</b><span class="rr4-unit"></span></div>
       <svg id="rr4Profile" width="196" height="74" viewBox="0 0 196 74" aria-label="Ascent/descent profile"></svg>
     </div>
@@ -392,6 +392,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=66"></script>
+<script src="app.js?v=67"></script>
 </body>
 </html>
