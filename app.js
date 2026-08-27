@@ -560,7 +560,7 @@ function currentMode() {
   return checked ? checked.value : 'forward';
 }
 
-const APP_VERSION = 'v1.59.0 · 2026-08-17';
+const APP_VERSION = 'v1.62.0 · 2026-08-17';
 
 function initMap() {
   state.map = L.map('map', { worldCopyJump: true, zoomControl: false }).setView([parseFloat($('launchLat').value), parseFloat($('launchLon').value)], 12);
@@ -757,6 +757,8 @@ async function searchPlace() {
 // Results modal
 // ---------------------------------------------------------------------
 function openResults() {
+  const bx = $('rr4Box');
+  if (bx && !bx.classList.contains('dragged')) bx.classList.add('pushed');
   const d = $('resultsDrawer');
   const h = $('resultsHandle');
   if (d) d.classList.remove('collapsed');
@@ -765,6 +767,8 @@ function openResults() {
   if (mw) mw.classList.add('results-open');
 }
 function closeResults() {
+  const bx = $('rr4Box');
+  if (bx) bx.classList.remove('pushed');
   const d = $('resultsDrawer');
   const h = $('resultsHandle');
   if (d) d.classList.add('collapsed');
@@ -875,7 +879,6 @@ async function runCalculation() {
     renderResults(r);
     drawTrajectory(r.traj);
     drawProfile(r.traj);
-    openResults();
     setTimeout(fitFlightPath, 320);
     checkAirspaceViolations(r.traj).catch(() => {});
     updateGmapsBtn();
@@ -957,6 +960,60 @@ function fillPointCells(r) {
   fillPlace(el2, land.lat, land.lon);
 }
 
+
+function updateRr4Box(r) {
+  const box = $('rr4Box');
+  if (!box || !r || !r.weather) return;
+  const relAlt = parseFloat($('releaseAlt').value);
+  const t = (id) => { const el = $(id); return el ? el.textContent : '—'; };
+  const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+  set('rr4Cutdown', isFinite(relAlt) ? `${Math.round(relAlt)} m` : '—');
+  set('rr4Ground', `${Math.round(r.weather.elevation)}`);
+  set('rr4Pressure', `${(r.weather.surfacePressurePa / 100).toFixed(1)}`);
+  set('rr4Lift', `${t('resGrossLift')} / ${t('resNetLift')}`);
+  set('rr4Times', `${t('resAscentTime')} / ${t('resFlightTime')}`);
+  set('rr4Dist', t('resDistance'));
+  set('rr4Burst', t('resBurstAlt'));
+  const as = $('rr4Airspace');
+  if (as) { as.textContent = '…'; as.classList.remove('viol', 'clear'); }
+  renderPfiProfile(r.traj);
+  box.hidden = false;   // reopens after manual close on every new trajectory
+}
+
+// Mini ascent/descent profile with shaded violations, no labels
+function renderPfiProfile(traj) {
+  const svg = $('rr4Profile');
+  if (!svg || !traj || !traj.path.length) return;
+  const W = 196, H = 74, padL = 4, padR = 4, padT = 5, padB = 5;
+  const path = traj.path;
+  const tMax = path[path.length - 1].t || 1;
+  let aMin = Infinity, aMax = -Infinity;
+  path.forEach(p => { aMin = Math.min(aMin, p.alt); aMax = Math.max(aMax, p.alt); });
+  if (aMax - aMin < 1) aMax = aMin + 1;
+  const x = t => padL + (W - padL - padR) * (t / tMax);
+  const y = a => H - padB - (H - padT - padB) * ((a - aMin) / (aMax - aMin));
+  let boxes = '';
+  (state.profileViolations || []).forEach(v => {
+    const x1 = Math.max(padL, x(v.tMin)), x2 = Math.min(W - padR, x(v.tMax));
+    const y1 = Math.max(padT, y(Math.min(v.maxAlt, aMax)));
+    const y2 = Math.min(H - padB, y(Math.max(v.minAlt, aMin)));
+    boxes += `<rect x="${x1.toFixed(1)}" y="${y1.toFixed(1)}" width="${Math.max(x2 - x1, 2).toFixed(1)}" height="${Math.max(y2 - y1, 2).toFixed(1)}" fill="#e0483f" opacity="0.3"/>`;
+  });
+  const pts = path.map(p => `${x(p.t).toFixed(1)},${y(p.alt).toFixed(1)}`).join(' ');
+  svg.innerHTML = `${boxes}<polyline points="${pts}" fill="none" stroke="#3fd0c9" stroke-width="1.8"/>`;
+}
+
+function updatePfiAirspace(traj) {
+  const as = $('rr4Airspace');
+  if (as) {
+    const bad = (state.profileViolations || []).length > 0;
+    as.textContent = bad ? 'violated' : 'clear';
+    as.classList.toggle('viol', bad);
+    as.classList.toggle('clear', !bad);
+  }
+  renderPfiProfile(traj);
+}
+
 function renderResults(r) {
   setVal('resPressure', (r.P0 / 100).toFixed(1), 'hPa');
   setVal('resGrossLift', (r.grossLiftKg * 1000).toFixed(1), 'g');
@@ -975,6 +1032,7 @@ function renderResults(r) {
   else setVal('resTropopause', 'not detectable', 'from levels');
   $('resWeatherSource').textContent = `Open-Meteo ${r.weather.isArchive ? '(historical archive)' : '(forecast)'} — model: ${r.weather.modelUsed} — matched: ${r.weather.matchedTime} UTC`;
   fillPointCells(r);
+  updateRr4Box(r);
   if (r.note) $('calcError').textContent = r.note;
 }
 
@@ -1309,7 +1367,6 @@ async function reverseCalcFromLanding(targetLat, targetLon) {
     renderResults(result);
     drawTrajectory(result.traj);
     drawProfile(result.traj);
-    openResults();
     setTimeout(fitFlightPath, 320);
     checkAirspaceViolations(result.traj).catch(() => {});
     updateGmapsBtn();
@@ -1658,6 +1715,7 @@ async function checkAirspaceViolations(traj) {
   });
   state.profileViolations = [...hits.values()];
   drawProfile(traj);
+  updatePfiAirspace(traj);
   if (hits.size === 0) {
     warnEl.hidden = false;
     warnEl.classList.remove('conflict');
@@ -2234,6 +2292,37 @@ function wireUI() {
   // Results drawer controls (left)
   on('resultsCloseBtn', 'click', closeResults);
   on('resultsHandle', 'click', toggleResults);
+
+  // Principal Flight Information box: close + manual dragging
+  on('rr4CloseBtn', 'click', (e) => { const b = $('rr4Box'); if (b) b.hidden = true; e.stopPropagation(); });
+  (function wireRr4Drag() {
+    const box = $('rr4Box'), grip = $('rr4DragHandle');
+    if (!box || !grip) return;
+    let sx = 0, sy = 0, ox = 0, oy = 0, dragging = false;
+    grip.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('#rr4CloseBtn')) return;
+      dragging = true;
+      const rect = box.getBoundingClientRect();
+      const parent = box.offsetParent.getBoundingClientRect();
+      ox = rect.left - parent.left; oy = rect.top - parent.top;
+      sx = e.clientX; sy = e.clientY;
+      box.classList.add('dragged');
+      box.style.right = 'auto';
+      box.style.left = ox + 'px';
+      box.style.top = oy + 'px';
+      grip.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    grip.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      box.style.left = (ox + e.clientX - sx) + 'px';
+      box.style.top = (oy + e.clientY - sy) + 'px';
+    });
+    const up = () => { dragging = false; };
+    grip.addEventListener('pointerup', up);
+    grip.addEventListener('pointercancel', up);
+  })();
+
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeResults(); });
 
   // Settings drawer (right) with handle

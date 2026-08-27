@@ -58,7 +58,7 @@
 </script>
 <title>Weather Sonde Flight Planning</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="style.css?v=59">
+<link rel="stylesheet" href="style.css?v=62">
   <script defer src="qrcode.js?v=1"></script>
 </head>
 <body>
@@ -186,6 +186,23 @@
     </div>
     </div>
     <div id="versionChip" class="version-badge"></div>
+
+    <div id="rr4Box" hidden>
+      <div class="rr4-title" id="rr4DragHandle">Principal Flight Information
+        <button type="button" id="rr4CloseBtn" class="overlay-close rr4-close" title="Close" aria-label="Close">✕</button>
+      </div>
+      <div class="rr4-sub">S2/RR4 Config Data</div>
+      <div class="rr4-row"><span>Cut-down Alt</span><b id="rr4Cutdown">—</b></div>
+      <div class="rr4-row"><span>Ground Alt (m MSL)</span><b id="rr4Ground">—</b></div>
+      <div class="rr4-row"><span>Ground pressure [hPa]</span><b id="rr4Pressure">—</b></div>
+      <div class="rr4-row"><span>Gross/net lift</span><b id="rr4Lift">—</b></div>
+      <div class="rr4-sub">Key Flight Data</div>
+      <div class="rr4-row"><span>Ascent/total time</span><b id="rr4Times">—</b></div>
+      <div class="rr4-row"><span>Landing Distance</span><b id="rr4Dist">—</b></div>
+      <div class="rr4-row"><span>Burst Alt</span><b id="rr4Burst">—</b></div>
+      <div class="rr4-row"><span>Airspace</span><b id="rr4Airspace">—</b></div>
+      <svg id="rr4Profile" width="196" height="74" viewBox="0 0 196 74" aria-label="Ascent/descent profile"></svg>
+    </div>
 
     <div id="resultsHandle" class="side-handle handle-results closed" title="Show / hide results"><span class="hbadge">2</span><span class="hlbl">Resulting flight data</span></div>
 
@@ -375,6 +392,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="app.js?v=59"></script>
+<script src="app.js?v=62"></script>
 </body>
 </html>

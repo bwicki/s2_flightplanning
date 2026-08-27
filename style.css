@@ -195,7 +195,7 @@ button.primary:active{transform:scale(0.99);}
 .preset-editor #presetMsg{white-space:normal;}
 
 /* ---- results drawer (left, with handle) ---- */
-:root{--results-w:clamp(230px,18vw,440px);--vsl-h:clamp(80px,calc(100dvh - 562px),172px);}
+:root{--results-w:clamp(230px,18vw,440px);--vsl-h:clamp(80px,calc(100dvh - 486px),172px);}
 #resultsDrawer{position:absolute;top:0;right:0;height:100%;width:var(--results-w);background:var(--panel);border-left:1px solid var(--border);z-index:940;display:flex;flex-direction:column;transform:translateX(0);transition:transform .25s ease;box-shadow:-4px 0 18px rgba(0,0,0,.35);}
 #resultsDrawer.collapsed{transform:translateX(102%);box-shadow:none;}
 .results-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:5px;display:flex;flex-direction:column;gap:4px;scrollbar-width:none;}
@@ -206,7 +206,7 @@ button.primary:active{transform:scale(0.99);}
 .wx-group{font-size:9.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);padding:8px 14px 3px;border-bottom:1px solid var(--border);background:var(--panel);position:sticky;top:0;}
 
 /* ---- labeled side handles ---- */
-.side-handle{position:absolute;top:150px;z-index:960;width:42px;min-height:260px;padding:12px 0;display:flex;flex-direction:column;align-items:center;gap:12px;cursor:pointer;user-select:none;box-shadow:0 2px 10px rgba(0,0,0,.35);transition:left .25s ease,right .25s ease;}
+.side-handle{position:absolute;top:118px;z-index:960;width:42px;min-height:230px;padding:10px 0;display:flex;flex-direction:column;align-items:center;gap:12px;cursor:pointer;user-select:none;box-shadow:0 2px 10px rgba(0,0,0,.35);transition:left .25s ease,right .25s ease;}
 .side-handle .hbadge{width:26px;height:26px;border-radius:50%;background:#fff;color:#16202a;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .side-handle .hlbl{writing-mode:vertical-rl;text-orientation:mixed;font-size:14px;font-weight:700;letter-spacing:.8px;white-space:nowrap;}
 .side-handle:active{filter:brightness(1.12);}
@@ -274,7 +274,7 @@ button.primary:active{transform:scale(0.99);}
 }
 
 /* ---- release-altitude slider below the green handle (cockpit slider idiom) ---- */
-#quickControls{position:absolute;top:424px;left:var(--drawer-w);z-index:955;display:flex;align-items:stretch;transition:left .25s ease;}
+#quickControls{position:absolute;bottom:12px;left:var(--drawer-w);z-index:955;display:flex;align-items:stretch;transition:left .25s ease;}
 #quickControls.closed{left:0;}
 #launchTimeBox{width:95px;background:var(--panel2);border:1px solid var(--border);border-left:none;border-right:none;border-radius:0;padding:8px 8px;box-shadow:2px 2px 10px rgba(0,0,0,.3);display:flex;flex-direction:column;align-items:center;gap:5px;}
 #launchTimeBox input{font-size:9.5px;padding:2px 0;text-align:center;}
@@ -408,3 +408,27 @@ body.day #ensembleLegend .el-lbl{color:#3a4148;}
 /* ICAO coordinate cells: coords line + "near place" line */
 .coordcell .pt-coord{display:block;font-size:10.5px;letter-spacing:-0.2px;white-space:nowrap;}
 .coordcell .pt-place{display:block;font-size:9px;color:var(--muted);font-family:var(--sans);margin-top:1px;}
+
+/* RR4 config parameters — floats left of the results handle */
+#rr4Box{position:absolute;top:118px;right:52px;z-index:955;transition:right 0.28s ease;background:rgba(20,26,33,0.92);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:8px 11px;min-width:172px;box-shadow:0 3px 10px rgba(0,0,0,.4);}
+#rr4Box .rr4-title{font-size:9.5px;font-weight:700;letter-spacing:.6px;color:#ffb454;text-transform:uppercase;margin-bottom:5px;}
+#rr4Box .rr4-row{display:flex;justify-content:space-between;gap:12px;font-size:10.5px;color:#aab4c0;padding:1.5px 0;}
+#rr4Box .rr4-row b{font-family:var(--mono);font-weight:600;color:#fff;white-space:nowrap;}
+body.day #rr4Box{background:rgba(255,255,255,0.95);border-color:#d3dae0;box-shadow:0 3px 10px rgba(0,0,0,.15);}
+body.day #rr4Box .rr4-title{color:#b07515;}
+body.day #rr4Box .rr4-row{color:#5c6b78;}
+body.day #rr4Box .rr4-row b{color:#16202a;}
+
+/* Principal Flight Information box v2 */
+#rr4Box.pushed{right:calc(var(--results-w) + 52px);}
+#rr4Box.dragged{transition:none;}
+#rr4Box .rr4-title{cursor:grab;user-select:none;padding-right:20px;position:relative;}
+#rr4Box .rr4-close{position:absolute;top:-3px;right:-4px;font-size:11px;padding:2px 5px;}
+.rr4-sub{font-size:8.5px;font-weight:700;letter-spacing:.5px;color:#8fb8e8;text-transform:uppercase;margin:6px 0 2px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:2px;}
+body.day .rr4-sub{color:#3a6ea5;border-bottom-color:rgba(0,0,0,0.1);}
+#rr4Airspace.viol{color:#ff6b61;}
+#rr4Airspace.clear{color:#3fd06b;}
+body.day #rr4Airspace.viol{color:#c0392b;}
+body.day #rr4Airspace.clear{color:#1e8449;}
+#rr4Profile{display:block;margin-top:6px;background:rgba(255,255,255,0.05);border-radius:6px;}
+body.day #rr4Profile{background:rgba(0,0,0,0.04);}
